@@ -4,7 +4,7 @@ import { SiteLogo } from "@/components/layout/SiteLogo";
 export function SiteHeader() {
   return (
     <header className="flex h-14 items-center justify-between bg-tosca px-4 md:h-16 md:px-6">
-      <SiteLogo height={24} />
+      <SiteLogo height={32} />
       <nav className="flex items-center gap-2 md:gap-3">
         <Link
           href="/registrasi"
