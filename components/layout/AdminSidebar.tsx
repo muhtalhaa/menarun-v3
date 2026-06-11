@@ -17,7 +17,7 @@ export function AdminSidebar({ adminName }: AdminSidebarProps) {
   return (
     <aside className="flex w-full flex-col border-b-2 border-tosca-muted bg-bg-card md:min-h-screen md:w-56 md:border-b-0 md:border-r-2">
       <div className="border-b-2 border-tosca-muted px-4 py-4">
-        <SiteLogo height={28} />
+        <SiteLogo height={20} />
         <p className="mt-2 font-pixel text-[8px] text-tosca-dark">Admin Panel</p>
         {adminName && (
           <p className="mt-1 font-sans text-xs text-text-muted">{adminName}</p>

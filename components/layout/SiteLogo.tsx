@@ -6,18 +6,17 @@ interface SiteLogoProps {
   className?: string;
 }
 
-export function SiteLogo({ height = 32, className = "" }: SiteLogoProps) {
-  const width = Math.round(height * 2.5);
-
+export function SiteLogo({ height = 24, className = "" }: SiteLogoProps) {
   return (
     <Link href="/" className={`inline-block pixel-transition ${className}`}>
       <Image
         src="/images/logo.png"
         alt="menaRun"
-        width={width}
+        width={height}
         height={height}
         data-pixel="true"
-        className="pixel-render"
+        className="pixel-render w-auto"
+        style={{ height: `${height}px` }}
         priority
       />
     </Link>
