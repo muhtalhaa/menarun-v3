@@ -28,13 +28,12 @@ export function ActivitySummaryCard({
           {formatDistance(summary.distanceKm)}
         </p>
         <p>
-          <span className="text-text-muted">Durasi:</span> {summary.duration}
+          <span className="text-text-muted">Pace:</span> {summary.pace} /km
         </p>
-        {summary.pace && (
-          <p>
-            <span className="text-text-muted">Pace:</span> {summary.pace} /km
-          </p>
-        )}
+        <p>
+          <span className="text-text-muted">Elevasi:</span> {summary.elevationM}{" "}
+          m
+        </p>
       </div>
 
       <p className="mt-4 font-pixelBody text-lg text-tosca-dark">

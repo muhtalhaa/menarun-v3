@@ -46,3 +46,23 @@ export function formatDateId(date: Date | string): string {
     timeZone: "Asia/Jakarta",
   });
 }
+
+export function formatDateTimeWib(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+    hour12: false,
+  });
+}
+
+export function wibTodayDate(): Date {
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Jakarta",
+  });
+  return new Date(`${today}T00:00:00.000Z`);
+}

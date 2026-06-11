@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,10 +12,20 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
+import { toast } from "sonner";
+import { unbanParticipant } from "@/actions/ban";
+import { BanParticipantDialog } from "@/components/admin/BanParticipantDialog";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { PixelInput } from "@/components/ui/PixelInput";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { formatDateId } from "@/lib/format";
+
+export interface ParticipantBanRow {
+  id: string;
+  eventNama: string;
+  tanggalMulai: string;
+  tanggalSelesai: string;
+}
 
 export interface ParticipantRow {
   id: string;
@@ -26,17 +37,44 @@ export interface ParticipantRow {
   usia: number;
   noHp: string;
   createdAt: string;
+  activeBans: ParticipantBanRow[];
+}
+
+interface EventOption {
+  id: string;
+  nama: string;
 }
 
 interface ParticipantsTableProps {
   data: ParticipantRow[];
+  events: EventOption[];
 }
 
-export function ParticipantsTable({ data }: ParticipantsTableProps) {
+export function ParticipantsTable({ data, events }: ParticipantsTableProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [sorting, setSorting] = useState<SortingState>([
     { id: "createdAt", desc: true },
   ]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [banTarget, setBanTarget] = useState<ParticipantRow | null>(null);
+
+  const handleUnban = useCallback(
+    (banId: string) => {
+      if (!confirm("Cabut ban ini?")) return;
+
+      startTransition(async () => {
+        const result = await unbanParticipant({ banId });
+        if (!result.success) {
+          toast.error(result.error.message);
+          return;
+        }
+        toast.success("Ban berhasil dicabut.");
+        router.refresh();
+      });
+    },
+    [router]
+  );
 
   const columns = useMemo<ColumnDef<ParticipantRow>[]>(
     () => [
@@ -52,8 +90,58 @@ export function ParticipantsTable({ data }: ParticipantsTableProps) {
         header: "Tgl Registrasi",
         cell: ({ getValue }) => formatDateId(getValue<string>()),
       },
+      {
+        id: "statusBanned",
+        header: "Status Banned",
+        cell: ({ row }) => {
+          const bans = row.original.activeBans;
+          if (bans.length === 0) {
+            return <span className="text-text-muted">—</span>;
+          }
+
+          return (
+            <div className="space-y-1">
+              {bans.map((ban) => (
+                <div
+                  key={ban.id}
+                  className="rounded-pixel border border-semantic-danger/30 bg-semantic-danger/5 px-2 py-1 text-xs text-semantic-danger"
+                >
+                  <p>
+                    Banned untuk event &quot;{ban.eventNama}&quot;
+                  </p>
+                  <p className="text-text-muted">
+                    {formatDateId(ban.tanggalMulai)} –{" "}
+                    {formatDateId(ban.tanggalSelesai)}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-1 font-semibold underline"
+                    onClick={() => handleUnban(ban.id)}
+                    disabled={isPending}
+                  >
+                    Unban
+                  </button>
+                </div>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: "Aksi",
+        cell: ({ row }) => (
+          <PixelButton
+            variant="secondary"
+            className="text-[10px] !px-2 !py-1 !text-semantic-danger"
+            onClick={() => setBanTarget(row.original)}
+          >
+            Ban
+          </PixelButton>
+        ),
+      },
     ],
-    []
+    [handleUnban, isPending]
   );
 
   const table = useReactTable({
@@ -91,7 +179,7 @@ export function ParticipantsTable({ data }: ParticipantsTableProps) {
 
       <PixelCard className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse font-sans text-sm">
+          <table className="w-full min-w-[1100px] border-collapse font-sans text-sm">
             <thead>
               {table.getHeaderGroups().map((hg) => (
                 <tr
@@ -134,7 +222,7 @@ export function ParticipantsTable({ data }: ParticipantsTableProps) {
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className="max-w-[180px] truncate px-3 py-2.5 text-text-primary"
+                        className="max-w-[220px] px-3 py-2.5 align-top text-text-primary"
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -173,6 +261,15 @@ export function ParticipantsTable({ data }: ParticipantsTableProps) {
           </PixelButton>
         </div>
       </div>
+
+      {banTarget && (
+        <BanParticipantDialog
+          participantId={banTarget.id}
+          participantName={banTarget.nama}
+          events={events}
+          onClose={() => setBanTarget(null)}
+        />
+      )}
     </div>
   );
 }

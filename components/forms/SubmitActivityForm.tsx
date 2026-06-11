@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import { PixelInput } from "@/components/ui/PixelInput";
 import { PixelSelect } from "@/components/ui/PixelSelect";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
-import { PixelLoader } from "@/components/ui/PixelLoader";
+import { formatDateId } from "@/lib/format";
 import {
   submitActivitySchema,
   type SubmitActivityInput,
@@ -21,32 +21,18 @@ import type { ActivitySubmitSummary } from "@/types/activity.types";
 interface EventOption {
   id: string;
   nama: string;
+  tanggalMulai: string;
+  tanggalSelesai: string;
 }
 
 interface SubmitActivityFormProps {
   events: EventOption[];
 }
 
-interface StravaPreview {
-  distance_km: number;
-  duration_sec: number;
-  pace_per_km: string | null;
-  activity_date: string;
-  title: string | null;
-  sport_type: string | null;
-}
-
-function formatPreviewDuration(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
 export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
   const [isPending, startTransition] = useTransition();
-  const [isPreviewing, setIsPreviewing] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<StravaPreview | null>(null);
+  const [banMessage, setBanMessage] = useState<string | null>(null);
   const [summary, setSummary] = useState<ActivitySubmitSummary | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -60,64 +46,40 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
   } = useForm<SubmitActivityInput>({
     resolver: zodResolver(submitActivitySchema),
     defaultValues: {
+      eventId: events[0]?.id ?? "",
       token: "",
       stravaUrl: "",
-      eventId: events[0]?.id ?? "",
+      distanceKm: undefined,
+      pacePerKm: "",
+      elevationM: undefined,
     },
   });
 
-  const stravaUrl = watch("stravaUrl");
   const eventId = watch("eventId");
 
-  async function handlePreview() {
-    if (!stravaUrl) {
-      toast.error("Masukkan link Strava terlebih dahulu.");
-      return;
-    }
-
-    if (!eventId) {
-      toast.error("Pilih event terlebih dahulu.");
-      return;
-    }
-
-    setIsPreviewing(true);
-    setPreview(null);
-    setServerError(null);
-
-    try {
-      const res = await fetch("/api/strava/parse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stravaUrl, eventId }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        const message = json.error?.message ?? "Gagal memparse link Strava.";
-        toast.error(message);
-        return;
-      }
-
-      setPreview(json.data);
-    } catch {
-      toast.error("Gagal memparse link Strava.");
-    } finally {
-      setIsPreviewing(false);
-    }
-  }
+  const selectedEvent = useMemo(
+    () => events.find((e) => e.id === eventId) ?? events[0],
+    [events, eventId]
+  );
 
   function onSubmit(data: SubmitActivityInput) {
     setServerError(null);
-    setPreview(null);
+    setBanMessage(null);
 
     startTransition(async () => {
       const result = await submitActivity({
         ...data,
         token: data.token.trim().toUpperCase(),
+        distanceKm: Number(data.distanceKm),
+        elevationM: Number(data.elevationM),
       });
 
       if (!result.success) {
+        if (result.error.code === "BANNED") {
+          setBanMessage(result.error.message);
+          return;
+        }
+
         setServerError(result.error.message);
         toast.error(result.error.message);
         return;
@@ -137,11 +99,13 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
   function handleSubmitAnother() {
     setSummary(null);
     setShowSummary(false);
-    setPreview(null);
     reset({
+      eventId: watch("eventId"),
       token: watch("token"),
       stravaUrl: "",
-      eventId: events[0]?.id ?? "",
+      distanceKm: undefined,
+      pacePerKm: "",
+      elevationM: undefined,
     });
   }
 
@@ -161,18 +125,46 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
         onComplete={handleCelebrationComplete}
       />
 
+      {banMessage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/50 p-4"
+          role="alertdialog"
+          aria-modal="true"
+        >
+          <div className="max-w-md rounded-pixel border-4 border-semantic-danger bg-bg-card p-6 shadow-pixel-lg">
+            <h2 className="font-pixel text-[10px] text-semantic-danger">
+              Peringatan
+            </h2>
+            <p className="mt-4 font-sans text-sm leading-relaxed text-text-primary">
+              {banMessage}
+            </p>
+            <div className="mt-6 flex justify-center">
+              <PixelButton onClick={() => setBanMessage(null)}>OK</PixelButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       <PixelCard className="p-6">
         <h1 className="font-pixel text-xs text-tosca-dark md:text-sm">
           Input Aktivitas
         </h1>
         <p className="mt-2 font-pixelBody text-lg text-text-muted">
-          Masukkan token dan link aktivitas Strava Anda.
+          Isi data aktivitas Anda. Admin akan memvalidasi dengan link Strava.
         </p>
 
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="mt-6 flex flex-col gap-4"
         >
+          <PixelSelect
+            label="Event"
+            placeholder="Pilih event"
+            options={events.map((e) => ({ value: e.id, label: e.nama }))}
+            error={errors.eventId?.message}
+            {...register("eventId")}
+          />
+
           <PixelInput
             label="Token"
             placeholder="Masukkan token Anda"
@@ -191,46 +183,40 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
               error={errors.stravaUrl?.message}
               {...register("stravaUrl")}
             />
-            <PixelButton
-              type="button"
-              variant="secondary"
-              onClick={handlePreview}
-              disabled={isPreviewing || !stravaUrl}
-              className="w-full sm:w-auto"
-            >
-              {isPreviewing ? "Memuat..." : "Preview"}
-            </PixelButton>
+            {selectedEvent && (
+              <p className="animate-period-pulse rounded-pixel border-2 px-3 py-2 font-sans text-xs font-semibold md:text-sm">
+                Aktivitas yang diterima dari{" "}
+                {formatDateId(selectedEvent.tanggalMulai)} ke{" "}
+                {formatDateId(selectedEvent.tanggalSelesai)}
+              </p>
+            )}
           </div>
 
-          {isPreviewing && (
-            <div className="flex justify-center py-2">
-              <PixelLoader size="sm" />
-            </div>
-          )}
+          <PixelInput
+            label="Jarak (km)"
+            type="number"
+            step="0.01"
+            min="0.01"
+            placeholder="5.25"
+            error={errors.distanceKm?.message}
+            {...register("distanceKm", { valueAsNumber: true })}
+          />
 
-          {preview && (
-            <div className="rounded-pixel border-2 border-tosca-muted bg-bg-toscaTint p-3 font-sans text-sm">
-              <p className="font-pixelBody text-base text-tosca-dark">
-                Preview Aktivitas
-              </p>
-              {preview.title && (
-                <p className="mt-1 text-text-primary">{preview.title}</p>
-              )}
-              <p className="mt-1 text-text-secondary">
-                {preview.distance_km.toFixed(2)} km ·{" "}
-                {formatPreviewDuration(preview.duration_sec)}
-                {preview.pace_per_km && ` · ${preview.pace_per_km}/km`}
-              </p>
-              <p className="text-text-muted">{preview.activity_date}</p>
-            </div>
-          )}
+          <PixelInput
+            label="Pace (per km)"
+            placeholder="5:30"
+            error={errors.pacePerKm?.message}
+            {...register("pacePerKm")}
+          />
 
-          <PixelSelect
-            label="Event"
-            placeholder="Pilih event"
-            options={events.map((e) => ({ value: e.id, label: e.nama }))}
-            error={errors.eventId?.message}
-            {...register("eventId")}
+          <PixelInput
+            label="Elevasi (meter)"
+            type="number"
+            step="1"
+            min="0"
+            placeholder="120"
+            error={errors.elevationM?.message}
+            {...register("elevationM", { valueAsNumber: true })}
           />
 
           {serverError && (

@@ -50,6 +50,23 @@ const config: Config = {
       borderRadius: {
         pixel: "2px",
       },
+      keyframes: {
+        "period-pulse": {
+          "0%, 100%": {
+            backgroundColor: "rgba(229, 161, 0, 0.12)",
+            borderColor: "#E5A100",
+            color: "#B45309",
+          },
+          "50%": {
+            backgroundColor: "rgba(229, 161, 0, 0.28)",
+            borderColor: "#B45309",
+            color: "#92400E",
+          },
+        },
+      },
+      animation: {
+        "period-pulse": "period-pulse 1.2s ease-in-out infinite",
+      },
     },
   },
   plugins: [],

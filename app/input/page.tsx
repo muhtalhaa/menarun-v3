@@ -11,8 +11,19 @@ export default async function InputPage() {
   const events = await prisma.event.findMany({
     where: { isActive: true },
     orderBy: { tanggalMulai: "desc" },
-    select: { id: true, nama: true },
+    select: {
+      id: true,
+      nama: true,
+      tanggalMulai: true,
+      tanggalSelesai: true,
+    },
   });
+
+  const eventOptions = events.map((event) => ({
+    ...event,
+    tanggalMulai: event.tanggalMulai.toISOString(),
+    tanggalSelesai: event.tanggalSelesai.toISOString(),
+  }));
 
   return (
     <main className="min-h-screen bg-bg-primary">
@@ -29,7 +40,7 @@ export default async function InputPage() {
             </p>
           </PixelCard>
         ) : (
-          <SubmitActivityForm events={events} />
+          <SubmitActivityForm events={eventOptions} />
         )}
 
         <p className="mt-6 text-center font-pixelBody text-lg">

@@ -8,32 +8,31 @@ export interface Activity {
   durationSec: number;
   durationType: "moving" | "elapsed";
   pacePerKm: string | null;
+  elevationM: number;
   activityDate: string;
   submittedAt: string;
 }
 
 export interface SubmitActivityInput {
+  eventId: string;
   token: string;
   stravaUrl: string;
-  eventId: string;
-}
-
-export interface StravaParseResult {
-  stravaActivityId: string | null;
-  title: string | null;
   distanceKm: number;
-  durationSec: number;
-  durationType: "moving" | "elapsed";
-  pacePerKm: string | null;
-  activityDate: string;
-  sportType: string | null;
-  rawMeta: Record<string, string>;
+  pacePerKm: string;
+  elevationM: number;
 }
 
 export interface ActivitySubmitSummary {
   nama: string;
   distanceKm: number;
-  duration: string;
-  pace: string | null;
+  pace: string;
+  elevationM: number;
   sisaKuotaHariIni: number;
+}
+
+export interface ManualActivityInput {
+  stravaUrl: string;
+  distanceKm: number;
+  pacePerKm: string;
+  elevationM: number;
 }

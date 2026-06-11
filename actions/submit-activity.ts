@@ -1,6 +1,10 @@
 "use server";
 
 import { processActivitySubmission } from "@/lib/activity-submission";
+import {
+  buildBanMessage,
+  getActiveBanForParticipantEvent,
+} from "@/lib/ban";
 import { prisma } from "@/lib/prisma";
 import { type ActionResult } from "@/lib/errors";
 import {
@@ -8,7 +12,6 @@ import {
   getDailySubmissionCount,
   isDailyLimitExceeded,
 } from "@/lib/rate-limiter";
-import { parseStravaUrl, StravaParseError } from "@/lib/strava-parser";
 import { submitActivitySchema } from "@/lib/validations/activity.schema";
 import type { ActivitySubmitSummary } from "@/types/activity.types";
 
@@ -28,7 +31,8 @@ export async function submitActivity(
     };
   }
 
-  const { token, stravaUrl, eventId } = parsed.data;
+  const { token, stravaUrl, eventId, distanceKm, pacePerKm, elevationM } =
+    parsed.data;
   const normalizedToken = token.trim().toUpperCase();
 
   const participant = await prisma.participant.findUnique({
@@ -41,18 +45,6 @@ export async function submitActivity(
       error: {
         code: "INVALID_TOKEN",
         message: "Token tidak valid. Periksa kembali token Anda.",
-      },
-    };
-  }
-
-  const dailyCount = await getDailySubmissionCount(participant.id);
-  if (isDailyLimitExceeded(dailyCount)) {
-    return {
-      success: false,
-      error: {
-        code: "RATE_LIMIT_EXCEEDED",
-        message:
-          "Token ini sudah mencapai batas 2 aktivitas hari ini. Coba lagi besok.",
       },
     };
   }
@@ -71,37 +63,38 @@ export async function submitActivity(
     };
   }
 
-  let stravaData;
-  try {
-    stravaData = await parseStravaUrl(stravaUrl);
-  } catch (error) {
-    if (error instanceof StravaParseError) {
-      const message =
-        error.code === "PARSE_FAILED"
-          ? "Link Strava tidak dapat dibaca. Pastikan link valid dan publik."
-          : error.message;
-
-      return {
-        success: false,
-        error: { code: error.code, message },
-      };
-    }
+  const activeBan = await getActiveBanForParticipantEvent(
+    participant.id,
+    eventId
+  );
+  if (activeBan) {
     return {
       success: false,
       error: {
-        code: "PARSE_FAILED",
-        message:
-          "Link Strava tidak dapat dibaca. Pastikan link valid dan publik.",
+        code: "BANNED",
+        message: buildBanMessage(activeBan),
       },
     };
   }
 
-  return processActivitySubmission(
-    participant,
-    event,
+  const dailyCount = await getDailySubmissionCount(participant.id, eventId);
+  if (isDailyLimitExceeded(dailyCount)) {
+    return {
+      success: false,
+      error: {
+        code: "RATE_LIMIT_EXCEEDED",
+        message:
+          "Token ini sudah mencapai batas 2 aktivitas hari ini untuk event ini. Coba lagi besok.",
+      },
+    };
+  }
+
+  return processActivitySubmission(participant, event, {
     stravaUrl,
-    stravaData
-  );
+    distanceKm,
+    pacePerKm,
+    elevationM,
+  });
 }
 
 export { DAILY_SUBMISSION_LIMIT };

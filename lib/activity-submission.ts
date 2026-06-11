@@ -1,19 +1,17 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { type ActionResult } from "@/lib/errors";
-import {
-  isActivityWithinEventPeriod,
-  outsideEventPeriodMessage,
-} from "@/lib/event-date-validation";
-import { formatDuration } from "@/lib/format";
+import { wibTodayDate } from "@/lib/format";
+import { durationSecFromPaceAndDistance } from "@/lib/pace";
 import {
   getRemainingDailyQuota,
   isDailyLimitExceeded,
   getDailySubmissionCount,
 } from "@/lib/rate-limiter";
+import { extractActivityId } from "@/lib/strava-url";
 import type {
   ActivitySubmitSummary,
-  StravaParseResult,
+  ManualActivityInput,
 } from "@/types/activity.types";
 
 interface SubmissionParticipant {
@@ -23,53 +21,33 @@ interface SubmissionParticipant {
 
 interface SubmissionEvent {
   id: string;
-  tanggalMulai: Date;
-  tanggalSelesai: Date;
 }
 
 export async function processActivitySubmission(
   participant: SubmissionParticipant,
   event: SubmissionEvent,
-  stravaUrl: string,
-  stravaData: StravaParseResult
+  input: ManualActivityInput
 ): Promise<ActionResult<ActivitySubmitSummary>> {
-  const dailyCount = await getDailySubmissionCount(participant.id);
+  const dailyCount = await getDailySubmissionCount(
+    participant.id,
+    event.id
+  );
   if (isDailyLimitExceeded(dailyCount)) {
     return {
       success: false,
       error: {
         code: "RATE_LIMIT_EXCEEDED",
         message:
-          "Token ini sudah mencapai batas 2 aktivitas hari ini. Coba lagi besok.",
+          "Token ini sudah mencapai batas 2 aktivitas hari ini untuk event ini. Coba lagi besok.",
       },
     };
   }
 
-  if (
-    !isActivityWithinEventPeriod(
-      stravaData.activityDate,
-      event.tanggalMulai,
-      event.tanggalSelesai
-    )
-  ) {
-    return {
-      success: false,
-      error: {
-        code: "OUTSIDE_EVENT_PERIOD",
-        message: outsideEventPeriodMessage(
-          stravaData.activityDate,
-          event.tanggalMulai,
-          event.tanggalSelesai
-        ),
-      },
-    };
-  }
+  const stravaActivityId = extractActivityId(input.stravaUrl);
 
-  const activityDate = new Date(stravaData.activityDate);
-
-  if (stravaData.stravaActivityId) {
+  if (stravaActivityId) {
     const duplicate = await prisma.activity.findFirst({
-      where: { stravaActivityId: stravaData.stravaActivityId },
+      where: { stravaActivityId },
     });
 
     if (duplicate) {
@@ -83,19 +61,24 @@ export async function processActivitySubmission(
     }
   }
 
+  const durationSec = durationSecFromPaceAndDistance(
+    input.pacePerKm,
+    input.distanceKm
+  );
+
   try {
     await prisma.activity.create({
       data: {
         participantId: participant.id,
         eventId: event.id,
-        stravaUrl,
-        stravaActivityId: stravaData.stravaActivityId,
-        distanceKm: stravaData.distanceKm,
-        durationSec: stravaData.durationSec,
-        durationType: stravaData.durationType,
-        pacePerKm: stravaData.pacePerKm,
-        activityDate,
-        rawMeta: stravaData.rawMeta,
+        stravaUrl: input.stravaUrl,
+        stravaActivityId,
+        distanceKm: input.distanceKm,
+        durationSec,
+        durationType: "moving",
+        pacePerKm: input.pacePerKm,
+        elevationM: input.elevationM,
+        activityDate: wibTodayDate(),
       },
     });
   } catch (error) {
@@ -121,15 +104,18 @@ export async function processActivitySubmission(
     };
   }
 
-  const sisaKuotaHariIni = await getRemainingDailyQuota(participant.id);
+  const sisaKuotaHariIni = await getRemainingDailyQuota(
+    participant.id,
+    event.id
+  );
 
   return {
     success: true,
     data: {
       nama: participant.nama,
-      distanceKm: stravaData.distanceKm,
-      duration: formatDuration(stravaData.durationSec),
-      pace: stravaData.pacePerKm,
+      distanceKm: input.distanceKm,
+      pace: input.pacePerKm,
+      elevationM: input.elevationM,
       sisaKuotaHariIni,
     },
   };

@@ -11,6 +11,7 @@ export type AppErrorCode =
   | "DUPLICATE_ACTIVITY"
   | "EVENT_INACTIVE"
   | "OUTSIDE_EVENT_PERIOD"
+  | "BANNED"
   | "UNAUTHORIZED"
   | "NOT_FOUND"
   | "INTERNAL_ERROR";

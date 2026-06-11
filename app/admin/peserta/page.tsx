@@ -1,27 +1,44 @@
 import { ParticipantsTable } from "@/components/admin/ParticipantsTable";
+import { getActiveBansByParticipantIds } from "@/lib/ban";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPesertaPage() {
-  const participants = await prisma.participant.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      token: true,
-      nama: true,
-      noAims: true,
-      majlis: true,
-      email: true,
-      usia: true,
-      noHp: true,
-      createdAt: true,
-    },
-  });
+  const [participants, events] = await Promise.all([
+    prisma.participant.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        token: true,
+        nama: true,
+        noAims: true,
+        majlis: true,
+        email: true,
+        usia: true,
+        noHp: true,
+        createdAt: true,
+      },
+    }),
+    prisma.event.findMany({
+      orderBy: { tanggalMulai: "desc" },
+      select: { id: true, nama: true },
+    }),
+  ]);
+
+  const banMap = await getActiveBansByParticipantIds(
+    participants.map((p) => p.id)
+  );
 
   const rows = participants.map((p) => ({
     ...p,
     createdAt: p.createdAt.toISOString(),
+    activeBans: (banMap.get(p.id) ?? []).map((ban) => ({
+      id: ban.id,
+      eventNama: ban.eventNama,
+      tanggalMulai: ban.tanggalMulai.toISOString(),
+      tanggalSelesai: ban.tanggalSelesai.toISOString(),
+    })),
   }));
 
   return (
@@ -34,7 +51,7 @@ export default async function AdminPesertaPage() {
       </p>
 
       <div className="mt-6">
-        <ParticipantsTable data={rows} />
+        <ParticipantsTable data={rows} events={events} />
       </div>
     </div>
   );

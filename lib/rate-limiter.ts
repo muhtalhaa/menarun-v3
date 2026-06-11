@@ -18,6 +18,7 @@ export function getWibDayBounds(now = new Date()) {
 
 export async function getDailySubmissionCount(
   participantId: string,
+  eventId: string,
   now = new Date()
 ): Promise<number> {
   const { start, end } = getWibDayBounds(now);
@@ -25,6 +26,7 @@ export async function getDailySubmissionCount(
   return prisma.activity.count({
     where: {
       participantId,
+      eventId,
       submittedAt: {
         gte: start,
         lt: end,
@@ -35,9 +37,10 @@ export async function getDailySubmissionCount(
 
 export async function getRemainingDailyQuota(
   participantId: string,
+  eventId: string,
   now = new Date()
 ): Promise<number> {
-  const count = await getDailySubmissionCount(participantId, now);
+  const count = await getDailySubmissionCount(participantId, eventId, now);
   return Math.max(0, DAILY_SUBMISSION_LIMIT - count);
 }
 
