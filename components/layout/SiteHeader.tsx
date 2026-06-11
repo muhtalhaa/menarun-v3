@@ -18,12 +18,6 @@ export function SiteHeader() {
         >
           Input
         </Link>
-        <Link
-          href="/login"
-          className="pixel-focus rounded-pixel border-2 border-text-onTosca bg-transparent px-2 py-1 font-pixel text-[8px] text-text-onTosca transition hover:bg-tosca-dark md:px-3 md:py-1.5 md:text-[10px]"
-        >
-          Login Admin
-        </Link>
       </nav>
     </header>
   );

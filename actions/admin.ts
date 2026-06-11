@@ -3,5 +3,5 @@
 import { signOut } from "@/lib/auth";
 
 export async function adminSignOut() {
-  await signOut({ redirectTo: "/login" });
+  await signOut({ redirectTo: "/login-admin-lari" });
 }

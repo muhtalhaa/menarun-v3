@@ -6,7 +6,7 @@ export const authConfig: NextAuthConfig = {
     strategy: "jwt",
   },
   pages: {
-    signIn: "/login",
+    signIn: "/login-admin-lari",
   },
   callbacks: {
     authorized({ auth, request }) {

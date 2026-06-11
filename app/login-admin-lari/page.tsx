@@ -4,7 +4,7 @@ import { AdminLoginForm } from "@/components/forms/AdminLoginForm";
 import { SiteLogo } from "@/components/layout/SiteLogo";
 import { PixelLoader } from "@/components/ui/PixelLoader";
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   return (
     <main className="min-h-screen bg-bg-primary">
       <div className="flex h-14 items-center justify-center bg-tosca md:h-16">
