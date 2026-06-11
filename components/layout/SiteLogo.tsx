@@ -8,7 +8,7 @@ interface SiteLogoProps {
   className?: string;
 }
 
-export function SiteLogo({ height = 32, className = "" }: SiteLogoProps) {
+export function SiteLogo({ height = 50, className = "" }: SiteLogoProps) {
   const width = Math.round(height * LOGO_ASPECT_RATIO);
 
   return (
