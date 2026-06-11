@@ -1,4 +1,5 @@
 import { PixelCard } from "@/components/ui/PixelCard";
+import { formatNumberId } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { Users, Calendar, Activity } from "lucide-react";
 
@@ -56,7 +57,7 @@ export default async function AdminDashboardPage() {
               <div>
                 <p className="font-sans text-sm text-text-muted">{label}</p>
                 <p className="mt-1 font-pixel text-sm text-tosca-dark">
-                  {value.toLocaleString("id-ID")}
+                  {formatNumberId(value)}
                 </p>
               </div>
               <Icon size={28} className={color} />

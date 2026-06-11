@@ -36,6 +36,7 @@ export default function RootLayout({
   return (
     <html
       lang="id"
+      suppressHydrationWarning
       className={`${inter.variable} ${pressStart.variable} ${vt323.variable}`}
     >
       <body className="min-h-screen font-sans antialiased">

@@ -8,7 +8,6 @@ import {
 import { prisma } from "@/lib/prisma";
 import { type ActionResult } from "@/lib/errors";
 import {
-  DAILY_SUBMISSION_LIMIT,
   getDailySubmissionCount,
   isDailyLimitExceeded,
 } from "@/lib/rate-limiter";
@@ -96,5 +95,3 @@ export async function submitActivity(
     elevationM,
   });
 }
-
-export { DAILY_SUBMISSION_LIMIT };

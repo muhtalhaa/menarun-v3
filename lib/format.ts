@@ -1,3 +1,8 @@
+import { formatInTimeZone } from "date-fns-tz";
+import { id as localeId } from "date-fns/locale";
+
+const WIB_TIMEZONE = "Asia/Jakarta";
+
 export function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("62")) {
@@ -39,30 +44,21 @@ export function formatDistance(distanceKm: number): string {
 
 export function formatDateId(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Asia/Jakarta",
-  });
+  return formatInTimeZone(d, WIB_TIMEZONE, "d MMMM yyyy", { locale: localeId });
 }
 
 export function formatDateTimeWib(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Jakarta",
-    hour12: false,
+  return formatInTimeZone(d, WIB_TIMEZONE, "d MMM yyyy, HH:mm", {
+    locale: localeId,
   });
 }
 
 export function wibTodayDate(): Date {
-  const today = new Date().toLocaleDateString("en-CA", {
-    timeZone: "Asia/Jakarta",
-  });
+  const today = formatInTimeZone(new Date(), WIB_TIMEZONE, "yyyy-MM-dd");
   return new Date(`${today}T00:00:00.000Z`);
+}
+
+export function formatNumberId(value: number): string {
+  return new Intl.NumberFormat("id-ID").format(value);
 }
