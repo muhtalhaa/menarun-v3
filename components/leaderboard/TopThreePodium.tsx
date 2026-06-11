@@ -8,7 +8,7 @@ interface TopThreePodiumProps {
 
 const PODIUM_ORDER = [1, 0, 2] as const;
 const MEDALS = ["🥇", "🥈", "🥉"] as const;
-const HEIGHTS = ["h-28", "h-36", "h-24"] as const;
+const HEIGHTS = ["h-36", "h-28", "h-24"] as const;
 const LABELS = ["1st", "2nd", "3rd"] as const;
 
 export function TopThreePodium({ entries }: TopThreePodiumProps) {
