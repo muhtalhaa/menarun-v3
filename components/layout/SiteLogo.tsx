@@ -6,7 +6,7 @@ interface SiteLogoProps {
   className?: string;
 }
 
-export function SiteLogo({ height = 24, className = "" }: SiteLogoProps) {
+export function SiteLogo({ height = 32, className = "" }: SiteLogoProps) {
   return (
     <Link href="/" className={`inline-block pixel-transition ${className}`}>
       <Image
