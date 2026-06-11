@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Page default */
+body {
+  background-color: #f7f4ef; /* bg-primary broken white */
+  color: #1a2e2a; /* text-primary */
+}
+
+/* Pixelated image rendering for logo + sprites */
+.pixel-render,
+img[data-pixel="true"] {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Choppy 8-bit transitions */
+.pixel-transition {
+  transition: all 0.2s steps(4, end);
+}
+
+/* Pixel focus ring */
+.pixel-focus:focus-visible {
+  outline: 2px solid #2a9d8f;
+  outline-offset: 2px;
+}
+
+/* PixelCelebration animations (SECTION 4.7) */
+@keyframes celebration-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes celebration-runner-walk {
+  0% {
+    transform: translateX(-120px) translateY(0);
+  }
+  25% {
+    transform: translateX(-60px) translateY(-4px);
+  }
+  50% {
+    transform: translateX(0) translateY(0);
+  }
+  75% {
+    transform: translateX(0) translateY(-4px);
+  }
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes celebration-flag-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes celebration-text-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes celebration-star-burst {
+  0% {
+    transform: scale(0) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5) translateY(-12px);
+    opacity: 0;
+  }
+}
+
+@keyframes celebration-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.celebration-overlay {
+  animation: celebration-fade-in 0.6s steps(4, end) forwards;
+}
+
+.celebration-runner {
+  animation: celebration-runner-walk 0.8s steps(4, end) 0.2s forwards;
+}
+
+.celebration-flag {
+  animation: celebration-flag-pop 0.6s steps(4, end) 0.8s forwards;
+  transform: scale(0);
+}
+
+.celebration-text {
+  animation: celebration-text-pop 1s steps(6, end) 1s forwards;
+  transform: scale(0);
+  opacity: 0;
+}
+
+.celebration-star {
+  animation: celebration-star-burst 0.8s steps(4, end) 1.4s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration-overlay,
+  .celebration-runner,
+  .celebration-flag,
+  .celebration-text,
+  .celebration-star {
+    animation: none;
+  }
+}

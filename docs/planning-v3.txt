@@ -1,0 +1,1739 @@
+================================================================================
+PROJECT PLANNING DOCUMENT: menaRun v3.0
+Event Leaderboard Platform for Strava Activities
+================================================================================
+
+DOCUMENT VERSION: 3.2
+TARGET AUDIENCE: AI code-generation models (Claude Sonnet, Cursor Auto, etc.)
+PURPOSE: Complete blueprint to build menaRun v3 from zero to launch on Vercel
+LAST UPDATED: 2026-06-11
+
+CHANGELOG v3.2:
+- Strengthened activity date lock: parsed Strava date must fall within event period
+- Preview API (/api/strava/parse) validates event period when eventId provided
+- Clearer OUTSIDE_EVENT_PERIOD error includes parsed activity date
+- Added QuoteCard on homepage (/) and /leaderboard only
+- Added SiteFooter on all public pages (not /admin, not /login)
+
+CHANGELOG v3.1:
+- Updated SECTION 4: light theme — broken white base + hijau tosca secondary
+- Added logo specification (dummy placeholder, swappable by user)
+- Added pixel celebration animation after successful data input (Mario-style)
+
+CHANGELOG v3.0:
+- Pivot from community-based platform → EVENT-BASED platform
+- Stack: Laravel monorepo → Next.js 15 full-stack monolith
+- Deploy: split hosting → single deploy on Vercel
+- Participant auth: login/password → registration + token (no login)
+- Admin auth: separate login-only flow for /admin dashboard
+- Added unique AIMS number as participant identity credential
+- Removed: communities, invite links, user profiles, gamification, Filament
+
+SUPERSEDES: docs/planning (1).txt (v2.0) — v2 codebase is archived reference only.
+
+================================================================================
+SECTION 0: HOW TO USE THIS DOCUMENT
+================================================================================
+
+This document is structured to be consumed sequentially by an AI builder.
+Each section is self-contained but builds on previous sections.
+
+INSTRUCTIONS FOR THE AI BUILDER:
+1. Read the entire document before writing any code.
+2. Follow the Tech Stack EXACTLY as specified — do not substitute libraries.
+3. Build phase by phase as defined in SECTION 14 (Roadmap).
+4. When in doubt, prioritize: simplicity > performance > features.
+5. All code must be production-ready: typed (TypeScript), validated, error-handled.
+6. Follow the folder structure in SECTION 3 strictly.
+7. Use the exact color tokens from SECTION 4.
+8. Database schema in SECTION 6 is the source of truth — do not invent fields.
+9. This is a SINGLE Next.js project — no separate frontend/backend repos.
+10. Participants do NOT log in. Token + AIMS are their credentials.
+11. Only admins log in (email + password via Auth.js).
+
+CONVENTIONS USED:
+- [MUST]    = Non-negotiable requirement
+- [SHOULD]  = Strong recommendation, deviate only with reason
+- [NICE]    = Optional enhancement
+- [POST-MVP] = Do NOT build in MVP phase
+
+================================================================================
+SECTION 1: PROJECT OVERVIEW
+================================================================================
+
+1.1 PRODUCT NAME
+    menaRun
+
+1.2 ELEVATOR PITCH
+    An event-based fitness leaderboard platform where participants register
+    once (no login required), receive a unique token, and submit Strava activity
+    links to compete in admin-managed events. Admins manage events and monitor
+    participant data via a protected dashboard.
+
+1.3 TARGET USERS
+
+    PARTICIPANTS (no login):
+    - Register with personal data (name, AIMS number, majlis, email, age, phone)
+    - Receive a unique token after registration
+    - Use token to submit Strava activity links per event
+    - View public leaderboard filtered by event
+
+    ADMINS (login required):
+    - Manage events (create, edit, delete, activate/deactivate)
+    - View and search participant data
+    - Export participant data [NICE]
+
+1.4 CORE VALUE PROPOSITION
+    - Zero friction for participants: register once, save token, submit activities
+    - No password, no login, no app install for participants
+    - Real-time event leaderboard with Strava auto-parsing
+    - Single deploy on Vercel — zero server ops
+
+1.5 PLATFORM
+
+    USER-FACING APP:
+    - Web app (Next.js App Router)
+    - MOBILE-FIRST responsive design (assume 80%+ users on phone browser)
+    - Optimized for screen width 360px–430px
+    - Must remain usable up to 1920px desktop
+    - Aesthetic: minimalist retro pixel/8-bit vibes on light broken-white base
+      with hijau tosca accents; includes logo and short Mario-style celebration
+      animation after successful form submissions
+
+    ADMIN PANEL:
+    - Web app (desktop-first, table-heavy UI)
+    - Built as /admin routes in same Next.js project
+    - Accessed at: /admin (protected by Auth.js middleware)
+    - Only accessible by users in the `admins` table
+
+1.6 KEY DIFFERENCES FROM v2
+
+    REMOVED:
+    - User login/register with password (participants)
+    - Communities, community members, invite links
+    - User profiles, avatars, personal stats pages
+    - Gamification (points, streaks, levels, achievements)
+    - Filament admin panel
+    - Laravel backend, Sanctum tokens
+    - Separate React SPA (apps/web) and Laravel API (apps/api)
+
+    ADDED:
+    - Participant registration with token issuance
+    - Unique AIMS number as identity credential
+    - Event-based competition (not community-based)
+    - Token-based activity submission (no login)
+    - Daily submission rate limit (2 per token per day)
+    - Custom admin dashboard in Next.js
+    - "Lupa Token?" recovery flow via AIMS + email
+
+================================================================================
+SECTION 2: TECH STACK (LOCKED — DO NOT SUBSTITUTE)
+================================================================================
+
+2.1 FRAMEWORK & RUNTIME
+    - [MUST] Framework: Next.js 15 (App Router)
+    - [MUST] Language: TypeScript (strict mode ON)
+    - [MUST] Runtime: Node.js 20+ (Vercel serverless)
+
+2.2 DATABASE & ORM
+    - [MUST] Database: PostgreSQL 14+ via Neon (Vercel Storage integration)
+    - [MUST] ORM: Prisma
+    - [MUST] Use UUIDs for primary keys (not auto-increment integers)
+    - [MUST] Migrations via `prisma migrate`
+
+2.3 AUTHENTICATION
+    - [MUST] Admin auth: Auth.js v5 (NextAuth) with Credentials provider
+    - [MUST] Password hashing: bcryptjs
+    - [MUST] Session strategy: JWT (serverless-compatible on Vercel)
+    - Participants: NO auth system — token validated per request on submit
+
+2.4 FRONTEND (within Next.js)
+    - [MUST] Styling: Tailwind CSS 3.4+
+    - [MUST] Forms: React Hook Form + Zod validation
+    - [MUST] Icons: lucide-react
+    - [SHOULD] Notifications: sonner (toast)
+    - [SHOULD] Animations: framer-motion
+    - [SHOULD] Date handling: date-fns
+    - [SHOULD] Admin tables: @tanstack/react-table
+
+2.5 SERVER-SIDE
+    - [MUST] Data mutations: Server Actions (preferred) or Route Handlers
+    - [MUST] HTML Parsing (Strava): cheerio
+    - [MUST] HTTP fetch: native fetch (Next.js built-in)
+    - [SHOULD] Rate limiting: custom middleware + DB counter
+
+2.6 INFRASTRUCTURE
+    - [MUST] Hosting: Vercel (single project, single deploy)
+    - [MUST] Database: Neon PostgreSQL (Vercel Storage tab → Create Database)
+    - [MUST] Timezone: Asia/Jakarta (WIB) for daily rate limits
+    - [NICE] CI: Vercel auto-deploy on git push to main
+
+2.7 PACKAGE VERSIONS (SUGGESTED — LATEST STABLE)
+
+    {
+      "next": "^15.0.0",
+      "react": "^18.3.0",
+      "react-dom": "^18.3.0",
+      "@prisma/client": "^6.0.0",
+      "prisma": "^6.0.0",
+      "next-auth": "^5.0.0",
+      "bcryptjs": "^2.4.3",
+      "react-hook-form": "^7.53.0",
+      "zod": "^3.23.0",
+      "@hookform/resolvers": "^3.9.0",
+      "tailwindcss": "^3.4.0",
+      "lucide-react": "^0.460.0",
+      "cheerio": "^1.0.0",
+      "date-fns": "^3.6.0",
+      "date-fns-tz": "^3.2.0",
+      "framer-motion": "^11.11.0",
+      "sonner": "^1.7.0",
+      "@tanstack/react-table": "^8.20.0",
+      "nanoid": "^5.0.0"
+    }
+
+================================================================================
+SECTION 3: PROJECT FOLDER STRUCTURE (EXACT)
+================================================================================
+
+menarun/                                  ← Git root (single Next.js project)
+├── app/
+│   ├── layout.tsx                        ← Root layout (fonts, toast, theme)
+│   ├── page.tsx                          ← Homepage (leaderboard + CTA)
+│   ├── globals.css                       ← Tailwind + pixel theme CSS
+│   ├── registrasi/
+│   │   ├── page.tsx                      ← Registration form
+│   │   └── sukses/page.tsx               ← Token display after registration
+│   ├── input/
+│   │   └── page.tsx                      ← Activity submission form
+│   ├── lupa-token/
+│   │   └── page.tsx                      ← Token recovery (AIMS + email)
+│   ├── leaderboard/
+│   │   └── page.tsx                      ← Full leaderboard with event filter
+│   ├── login/
+│   │   └── page.tsx                      ← Admin login only
+│   ├── admin/
+│   │   ├── layout.tsx                    ← Admin layout (sidebar + auth guard)
+│   │   ├── page.tsx                      ← Dashboard overview stats
+│   │   ├── peserta/
+│   │   │   └── page.tsx                  ← Participant data table
+│   │   └── event/
+│   │       ├── page.tsx                  ← Event list
+│   │       ├── baru/page.tsx             ← Create event form
+│   │       └── [id]/edit/page.tsx        ← Edit event form
+│   └── api/
+│       ├── auth/[...nextauth]/route.ts   ← Auth.js handler
+│       ├── strava/parse/route.ts         ← Strava URL preview parse
+│       └── admin/export/peserta/route.ts ← CSV export [NICE]
+├── components/
+│   ├── ui/
+│   │   ├── PixelButton.tsx
+│   │   ├── PixelCard.tsx
+│   │   ├── PixelInput.tsx
+│   │   ├── PixelSelect.tsx
+│   │   ├── PixelBadge.tsx
+│   │   ├── PixelLoader.tsx
+│   │   └── PixelModal.tsx
+│   ├── layout/
+│   │   ├── SiteHeader.tsx                ← Logo + Registrasi/Input/Login buttons
+│   │   ├── SiteLogo.tsx                  ← Logo component (reads /images/logo.png)
+│   │   ├── QuoteCard.tsx                 ← Inspirational quote (homepage + leaderboard)
+│   │   ├── SiteFooter.tsx                ← Public pages footer attribution
+│   │   └── AdminSidebar.tsx
+│   ├── celebration/
+│   │   └── PixelCelebration.tsx          ← Mario-style success animation overlay
+│   ├── forms/
+│   │   ├── RegistrationForm.tsx
+│   │   ├── SubmitActivityForm.tsx
+│   │   ├── TokenRecoveryForm.tsx
+│   │   ├── EventForm.tsx
+│   │   └── AdminLoginForm.tsx
+│   └── leaderboard/
+│       ├── TopThreePodium.tsx
+│       ├── LeaderboardTable.tsx
+│       ├── EventFilter.tsx
+│       └── EventDescription.tsx
+├── lib/
+│   ├── prisma.ts                         ← Prisma client singleton
+│   ├── auth.ts                           ← Auth.js config
+│   ├── strava-parser.ts                  ← Strava HTML/OG parser (port from v2 PHP)
+│   ├── token-generator.ts                ← Generate unique 8-char tokens
+│   ├── rate-limiter.ts                   ← Daily submission limit logic
+│   ├── event-date-validation.ts          ← Activity date vs event period check
+│   ├── leaderboard.ts                    ← Leaderboard aggregation queries
+│   ├── validations/
+│   │   ├── registration.schema.ts
+│   │   ├── activity.schema.ts
+│   │   ├── event.schema.ts
+│   │   └── admin.schema.ts
+│   ├── errors.ts                         ← App error types + messages (Indonesian)
+│   └── format.ts                         ← pace, distance, duration formatters
+├── actions/
+│   ├── register-participant.ts           ← Server Action: registration
+│   ├── submit-activity.ts                ← Server Action: activity submit
+│   ├── recover-token.ts                  ← Server Action: token recovery
+│   ├── event.ts                          ← Server Actions: event CRUD
+│   └── admin.ts                          ← Server Actions: admin utilities
+├── types/
+│   ├── participant.types.ts
+│   ├── activity.types.ts
+│   ├── event.types.ts
+│   └── leaderboard.types.ts
+├── prisma/
+│   ├── schema.prisma                     ← Database schema (source of truth)
+│   ├── seed.ts                           ← Seed: majlis, admin, sample event
+│   └── migrations/                       ← Auto-generated by prisma migrate
+├── data/
+│   └── majlis.json                       ← ~160 majlis names (static seed data)
+├── public/
+│   └── images/
+│       ├── logo.png                      ← [DUMMY] App logo — user replaces later
+│       └── celebration/
+│           └── runner-sprite.png         ← [DUMMY] Pixel runner for celebration anim
+├── middleware.ts                          ← Protect /admin/* routes
+├── tailwind.config.ts
+├── next.config.ts
+├── vercel.json
+├── package.json
+├── tsconfig.json
+├── .env.example
+├── .gitignore
+└── docs/
+    ├── planning-v3.txt                   ← THIS DOCUMENT
+    └── planning (1).txt                    ← v2 archive (reference only)
+
+================================================================================
+SECTION 4: DESIGN SYSTEM (PIXEL/8-BIT THEME — LIGHT BROKEN WHITE + TOSCA)
+================================================================================
+
+4.1 COLOR PHILOSOPHY
+
+    Base theme is LIGHT (not dark). Two anchor colors:
+      - Broken white  → page background, airy and warm (not pure #FFFFFF)
+      - Hijau tosca   → secondary color for headers, buttons, accents, borders
+
+    All text defaults to DARK for readability on light backgrounds.
+    Tosca is used for interactive elements and brand identity.
+
+4.2 COLOR TOKENS (tailwind.config.ts)
+
+theme: {
+  extend: {
+    colors: {
+      bg: {
+        primary: '#F7F4EF',     // Broken white — main page background
+        card: '#FFFFFF',        // Card / modal surface (pure white on broken white)
+        tertiary: '#EDE8DF',    // Hover / pressed surface (darker broken white)
+        toscaTint: '#E8F5F2',   // Subtle tosca wash for section backgrounds
+      },
+      tosca: {
+        DEFAULT: '#2A9D8F',     // Hijau tosca — secondary brand color
+        light: '#3DCFBF',       // Hover / highlight
+        dark: '#1F7A6F',        // Pressed / shadow
+        muted: '#2A9D8F33',     // Border / subtle fill (~20% alpha)
+      },
+      text: {
+        primary: '#1A2E2A',     // Main body text (dark green-gray)
+        secondary: '#3D5C55',   // Subheadings, labels
+        muted: '#6B8F87',       // Hints, placeholders
+        disabled: '#A8C4BC',    // Disabled state
+        onTosca: '#FFFFFF',     // Text on tosca backgrounds (buttons, header bar)
+      },
+      semantic: {
+        danger: '#E05252',
+        warning: '#E5A100',
+        success: '#2A9D8F',     // Reuse tosca for success (brand consistent)
+        info: '#3B82F6',
+      },
+    },
+    fontFamily: {
+      pixel: ['"Press Start 2P"', 'monospace'],
+      pixelBody: ['"VT323"', 'monospace'],
+      sans: ['Inter', 'system-ui', 'sans-serif'],
+    },
+    boxShadow: {
+      'pixel-sm': '2px 2px 0 #1F7A6F',
+      'pixel-md': '4px 4px 0 #1F7A6F',
+      'pixel-lg': '6px 6px 0 #1F7A6F',
+      'pixel-glow': '0 0 12px #2A9D8F50',
+      'card': '4px 4px 0 #2A9D8F33',
+    },
+    borderRadius: {
+      'pixel': '2px',
+    },
+  },
+}
+
+4.3 GLOBAL CSS (app/globals.css)
+
+    /* Page default */
+    body {
+      background-color: #F7F4EF;   /* bg-primary broken white */
+      color: #1A2E2A;              /* text-primary */
+    }
+
+    /* Pixelated image rendering for logo + sprites */
+    .pixel-render,
+    img[data-pixel="true"] {
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+
+    /* Choppy 8-bit transitions */
+    .pixel-transition {
+      transition: all 0.2s steps(4, end);
+    }
+
+    /* Pixel focus ring */
+    .pixel-focus:focus-visible {
+      outline: 2px solid #2A9D8F;
+      outline-offset: 2px;
+    }
+
+4.4 TYPOGRAPHY RULES
+    - Font "Press Start 2P": ONLY for short labels (buttons, headings, max 30 chars).
+      Sizes: 10px, 12px, 14px MAX on mobile. Color: text-primary or text-onTosca.
+    - Font "VT323": Body text, descriptions, celebration message.
+      Sizes: 16px, 18px, 20px, 24px. Color: text-primary or tosca-dark.
+    - Font "Inter": Form input values, tables, anything that MUST be readable.
+
+4.5 LOGO
+
+4.5.1 ASSET (DUMMY — user replaces later)
+
+    File path : public/images/logo.png
+    Size      : 120 × 48 px recommended (or square 64 × 64 px)
+    Format    : PNG with transparent background (preferred) or SVG
+    Style     : Pixel/8-bit aesthetic, tosca green on transparent or broken white
+    Status    : [DUMMY] Placeholder until user provides final logo
+
+    Dummy placeholder spec (build with simple pixel art or text):
+      - Pixel letters "MR" or simple running figure silhouette
+      - Colors: tosca (#2A9D8F) + dark green (#1A2E2A)
+      - Must look acceptable at 32px height (mobile header)
+
+4.5.2 COMPONENT (components/layout/SiteLogo.tsx)
+
+    - Renders <Image src="/images/logo.png" alt="menaRun" data-pixel="true" />
+    - Used in SiteHeader on all public pages
+    - Also shown in admin sidebar (smaller, 28px height)
+    - Clicking logo navigates to / (homepage)
+
+    Swappability rule [MUST]:
+      User replaces ONLY the file at public/images/logo.png.
+      No code changes required. Component path stays the same.
+
+4.5.3 HEADER BAR
+
+    SiteHeader background: tosca DEFAULT (#2A9D8F)
+    Logo + nav buttons on tosca bar:
+      - Logo: left-aligned
+      - Buttons (Registrasi | Input | Login): right-aligned or below on mobile
+      - Button style on tosca bar: white outline or bg-card with tosca text
+      - Text on header: text-onTosca (#FFFFFF)
+
+4.6 COMPONENT DESIGN PATTERNS
+
+    PixelButton (primary):
+    - background: tosca DEFAULT
+    - color: text-onTosca (#FFFFFF)
+    - border: 2px solid tosca-dark
+    - box-shadow: 4px 4px 0 tosca-dark (hard shadow, no blur)
+    - On hover: translate +1px both axes, shadow 3px 3px 0, bg tosca-light
+    - On active: translate +2px both axes, shadow 2px 2px 0, bg tosca-dark
+    - Font: Press Start 2P, uppercase, 12px
+    - No border-radius OR max 2px
+
+    PixelButton (secondary/outline):
+    - background: bg-card (#FFFFFF)
+    - color: tosca DEFAULT
+    - border: 2px solid tosca DEFAULT
+    - box-shadow: 4px 4px 0 tosca-muted
+
+    PixelCard:
+    - border: 2px solid tosca-muted
+    - background: bg-card (#FFFFFF)
+    - box-shadow: 4px 4px 0 tosca-muted (shadow-card)
+
+    PixelInput / PixelSelect:
+    - border: 2px solid tosca-muted
+    - background: bg-card (#FFFFFF)
+    - color: text-primary
+    - On focus: border solid tosca + shadow pixel-glow
+    - Font: Inter for value, VT323 for placeholder
+
+    SiteHeader:
+    - background: tosca DEFAULT
+    - height: 56px mobile / 64px desktop
+    - Logo left, action buttons right
+
+    EVERY interactive element MUST have visible focus state for accessibility.
+
+4.7 PIXEL CELEBRATION ANIMATION (Mario-style)
+
+4.7.1 OVERVIEW
+
+    A short, playful 8-bit celebration overlay shown AFTER successful data
+    submission. Inspired by classic Mario end-of-level flag animation.
+    Text displayed: "Mubarak! Khuddam Zindabad!"
+
+    Triggers on:
+      [MUST] Successful participant registration → before showing token
+      [MUST] Successful activity submission → before showing activity summary
+
+    Does NOT trigger on:
+      - Failed submissions / validation errors
+      - Admin actions
+      - Token recovery
+
+4.7.2 COMPONENT (components/celebration/PixelCelebration.tsx)
+
+    Props:
+      isVisible: boolean
+      onComplete: () => void    // called after animation ends (~2.5s)
+
+    Visual layout (mobile-first, centered overlay):
+    ┌─────────────────────────────────────┐
+    │  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │  ← semi-transparent backdrop
+    │                                     │     (bg-primary at 90% opacity)
+    │         [🏁 flag sprite]            │  ← flag pops from top
+    │                                     │
+    │      [🏃 runner sprite]             │  ← runner bounces across
+    │                                     │
+    │   Mubarak! Khuddam Zindabad!        │  ← pixel text, scales in
+    │                                     │
+    │         ✦ ✦ ✦ ✦ ✦                  │  ← pixel stars/sparkles
+    └─────────────────────────────────────┘
+
+4.7.3 ANIMATION SEQUENCE (total ~2.5 seconds)
+
+    Step 1 (0.0s – 0.6s): Backdrop fades in (opacity 0 → 1, steps easing)
+    Step 2 (0.2s – 1.0s): Runner sprite enters from left, bounce-walks to center
+              - Use CSS @keyframes with steps(4) for choppy pixel movement
+              - Sprite: public/images/celebration/runner-sprite.png [DUMMY]
+              - Size: 48 × 48 px, image-rendering: pixelated
+    Step 3 (0.8s – 1.4s): Flag icon pops up from behind runner (scale 0 → 1, steps)
+              - Simple pixel flag: CSS div or small PNG sprite
+              - Color: tosca + broken white stripes
+    Step 4 (1.0s – 2.0s): Text "Mubarak! Khuddam Zindabad!" appears
+              - Font: Press Start 2P, 10–12px mobile, color: tosca-dark
+              - Animation: scale from 0 to 1 with steps(6), slight bounce
+              - Line break allowed on mobile: "Mubarak!" / "Khuddam Zindabad!"
+    Step 5 (1.4s – 2.2s): 5–8 pixel star particles burst outward (CSS only)
+              - Small 4×4 px squares, tosca + gold (#E5A100), fade out
+    Step 6 (2.2s – 2.5s): Whole overlay fades out → onComplete() called
+              - Parent shows success content (token card or activity summary)
+
+    Implementation: framer-motion with steps easing OR pure CSS @keyframes.
+    Prefer CSS @keyframes for performance on mobile. No external sprite sheet
+    library required.
+
+4.7.4 INTEGRATION FLOW
+
+    REGISTRATION SUCCESS (/registrasi/sukses):
+      1. User submits registration form
+      2. Server Action succeeds → redirect to /registrasi/sukses?token=XXX
+      3. Page mounts → PixelCelebration isVisible=true
+      4. Animation plays (~2.5s)
+      5. onComplete → reveal token card with copy button
+
+    ACTIVITY SUBMIT SUCCESS (/input):
+      1. User submits activity form
+      2. Server Action succeeds → returns { success: true, data: summary }
+      3. Client sets showCelebration=true (no redirect)
+      4. PixelCelebration overlay plays (~2.5s)
+      5. onComplete → reveal activity summary card + remaining quota
+
+4.7.5 ASSETS (DUMMY)
+
+    public/images/celebration/runner-sprite.png
+      - 48×48 px pixel art runner figure [DUMMY — simple colored block figure OK]
+      - Colors: tosca + dark green
+
+    Flag + stars: pure CSS shapes in MVP (no extra image files required).
+
+4.7.6 RULES
+
+    [MUST] Animation duration ≤ 3 seconds (keep it short)
+    [MUST] User can tap/click backdrop to skip animation early [SHOULD]
+    [MUST] Animation must not block error states
+    [MUST] Text exactly: "Mubarak! Khuddam Zindabad!" (do not change)
+    [NICE] Subtle 8-bit chiptune SFX on play (muted by default, no autoplay audio)
+    [NICE] Reduce-motion: respect prefers-reduced-motion → skip to onComplete immediately
+
+================================================================================
+SECTION 5: ROUTING STRUCTURE
+================================================================================
+
+5.1 PUBLIC ROUTES (no auth required)
+
+    /                       → Homepage
+                              Shows: current event leaderboard, event description,
+                              buttons: Registrasi | Input Aktivitas | Login
+    /registrasi             → RegistrationForm (participant data)
+    /registrasi/sukses      → Token display page (query param: ?token=XXX)
+    /input                  → SubmitActivityForm (token + strava link + event)
+    /lupa-token             → TokenRecoveryForm (AIMS + email → show token)
+    /leaderboard            → Full leaderboard page with event filter dropdown
+    /login                  → AdminLoginForm (admin only — NOT for participants)
+
+5.2 PROTECTED ROUTES (admin auth required — middleware.ts)
+
+    /admin                  → Dashboard overview (participant count, event count)
+    /admin/peserta          → Participant data table (search, sort)
+    /admin/event            → Event list (with create/edit/delete actions)
+    /admin/event/baru         → Create event form
+    /admin/event/[id]/edit    → Edit event form
+
+5.3 MIDDLEWARE LOGIC (middleware.ts)
+
+    - Match paths: /admin/*
+    - Exclude: /admin/login (if nested) — login is at /login not /admin/login
+    - Check Auth.js session
+    - If no session: redirect to /login?callbackUrl=/admin
+    - If session exists: allow through
+
+5.4 HOMEPAGE LAYOUT (/)
+
+    Background: broken white (#F7F4EF)
+
+    ┌─────────────────────────────────────┐
+    │ ■■■■■■■ HIJAU TOSCA HEADER ■■■■■■■  │
+    │  [LOGO]          [Reg][Input][Login]│  ← SiteLogo + nav on tosca bar
+    ├─────────────────────────────────────┤
+    │  EVENT: Lomba Lari Ramadhan 2026    │  ← tosca heading text
+    │  1 Jun – 30 Jun 2026                │
+    │  Deskripsi event ditampilkan di sini │
+    ├─────────────────────────────────────┤
+    │  Filter Event: [▼ dropdown]         │
+    │                                     │
+    │      🥈 2nd   🥇 1st   🥉 3rd       │  ← white cards on broken white
+    │                                     │
+    │  #  Nama     Majlis    Jarak  Akt.  │
+    │  1  Ahmad    Majlis A   42.5km  8   │
+    │  2  Budi     Majlis B   38.2km  6   │
+    │  ...                                │
+    ├─────────────────────────────────────┤
+    │  [Lupa Token?]                      │
+    ├─────────────────────────────────────┤
+    │  QUOTE CARD (homepage + leaderboard)  │
+    │  "A Nation Cannot Be Reformed..."   │
+    ├─────────────────────────────────────┤
+    │  FOOTER (all public pages)          │
+    │  Created by Muawin Sadr IT PPMKAI   │
+    └─────────────────────────────────────┘
+
+4.8 QUOTE CARD (homepage + /leaderboard ONLY)
+
+    Component: components/layout/QuoteCard.tsx
+
+    Quote text [MUST]:
+      "A Nation Cannot Be Reformed Without Reformation of its Youth"
+    Attribution [MUST]:
+      — Hadhrat Mirza Basyiruddin Mahmud Ahmad ra.
+      Khalifatul Masih II
+
+    Placement:
+      - Below "Lupa Token?" link on homepage (/)
+      - Below content on /leaderboard
+      - NOT on /registrasi, /input, /lupa-token, or admin pages
+
+4.9 SITE FOOTER (public pages only)
+
+    Component: components/layout/SiteFooter.tsx
+
+    Text [MUST]:
+      "Created by Muawin Sadr IT PPMKAI · Managed by Sehat Jasmani PPMKAI ·
+       Powered by Cursor"
+
+    Placement:
+      - All participant-facing public pages: /, /registrasi, /registrasi/sukses,
+        /input, /lupa-token, /leaderboard
+      - NOT on /admin/* or /login
+
+================================================================================
+SECTION 6: DATABASE SCHEMA (SOURCE OF TRUTH)
+================================================================================
+
+6.1 TABLE: participants
+
+Column              Type              Constraints
+----------          ----              -----------
+id                  UUID              PRIMARY KEY
+token               VARCHAR(12)       UNIQUE NOT NULL
+nama                VARCHAR(100)      NOT NULL
+no_aims             CHAR(5)           UNIQUE NOT NULL
+majlis              VARCHAR(150)      NOT NULL
+email               VARCHAR(255)      NOT NULL
+usia                SMALLINT          NOT NULL
+no_hp               VARCHAR(20)       NOT NULL
+created_at          TIMESTAMP         NOT NULL DEFAULT now()
+
+Indexes:
+  - UNIQUE (token)
+  - UNIQUE (no_aims)              ← AIMS is unique identity credential
+  - INDEX (majlis)
+  - INDEX (email)
+
+Notes:
+- no_aims: exactly 5 numeric digits. Validated at app layer: /^\d{5}$/
+- token: 8-character uppercase alphanumeric, auto-generated via nanoid
+- One AIMS number = one participant = one token, forever
+- Participants do NOT have passwords and do NOT log in
+- email is NOT unique in MVP (only AIMS is unique) — but used for token recovery
+
+6.2 TABLE: events
+
+Column              Type              Constraints
+----------          ----              -----------
+id                  UUID              PRIMARY KEY
+nama                VARCHAR(150)      NOT NULL
+deskripsi           TEXT              NOT NULL
+tanggal_mulai       DATE              NOT NULL
+tanggal_selesai     DATE              NOT NULL
+is_active           BOOLEAN           DEFAULT true
+created_at          TIMESTAMP         NOT NULL DEFAULT now()
+updated_at          TIMESTAMP         NOT NULL DEFAULT now()
+
+Indexes:
+  - INDEX (is_active, tanggal_selesai DESC)
+
+Notes:
+- "Durasi Event" = tanggal_mulai to tanggal_selesai (date range, not duration)
+- "Event terkini" on homepage = event where is_active=true AND
+  CURRENT_DATE BETWEEN tanggal_mulai AND tanggal_selesai.
+  If multiple match: pick the one with latest tanggal_mulai.
+  If none match: show most recent event + banner "Tidak ada event aktif saat ini"
+- deskripsi is displayed on homepage and leaderboard for participants to read
+- Deleting event with existing activities: use soft delete (set is_active=false)
+  [MUST NOT hard delete events that have activities attached]
+
+6.3 TABLE: activities
+
+Column              Type              Constraints
+----------          ----              -----------
+id                  UUID              PRIMARY KEY
+participant_id      UUID              FK → participants.id, NOT NULL
+event_id            UUID              FK → events.id, NOT NULL
+strava_url          VARCHAR(500)      NOT NULL
+strava_activity_id  VARCHAR(50)       NULLABLE (extracted from URL)
+distance_km         DECIMAL(8,2)      NOT NULL
+duration_sec        INT               NOT NULL
+duration_type       VARCHAR(10)       NOT NULL DEFAULT 'moving'
+                                        -- 'moving' | 'elapsed'
+pace_per_km         VARCHAR(10)       NULLABLE (computed, format "M:SS")
+activity_date       DATE              NOT NULL
+raw_meta            JSON              NULLABLE (OG tag snapshot for audit)
+submitted_at        TIMESTAMP         NOT NULL DEFAULT now()
+created_at          TIMESTAMP         NOT NULL DEFAULT now()
+
+Indexes:
+  - INDEX (event_id, participant_id)
+  - INDEX (participant_id, submitted_at)
+  - UNIQUE (strava_activity_id, event_id)    -- no duplicate link per event
+  - UNIQUE (strava_activity_id)              -- no duplicate link globally (anti-cheat)
+  - INDEX (event_id, distance_km DESC)         -- leaderboard query
+
+Notes:
+- duration_type: prefer 'moving' time from Strava; fallback to 'elapsed'
+- pace_per_km computed server-side: duration_sec / distance_km → "M:SS" string
+- activity_date from Strava meta; must NOT be in the future
+- submitted_at used for daily rate limit counting (timezone: Asia/Jakarta)
+
+6.4 TABLE: admins
+
+Column              Type              Constraints
+----------          ----              -----------
+id                  UUID              PRIMARY KEY
+email               VARCHAR(255)      UNIQUE NOT NULL
+password_hash       VARCHAR(255)      NOT NULL
+nama                VARCHAR(100)      NOT NULL
+created_at          TIMESTAMP         NOT NULL DEFAULT now()
+
+Notes:
+- Seeded via prisma/seed.ts with one default admin account
+- Password hashed with bcryptjs (12 rounds)
+- Only admins log in to the application
+
+6.5 TABLE: majlis
+
+Column              Type              Constraints
+----------          ----              -----------
+id                  SERIAL            PRIMARY KEY
+nama                VARCHAR(150)      UNIQUE NOT NULL
+is_active           BOOLEAN           DEFAULT true
+
+Notes:
+- Seeded from data/majlis.json (~160 entries)
+- Used as dropdown options in registration form
+- Admin does NOT manage majlis in MVP (static seed)
+- [POST-MVP] Admin CRUD for majlis list
+
+6.6 PRISMA SCHEMA (prisma/schema.prisma)
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Participant {
+  id         String     @id @default(uuid())
+  token      String     @unique @db.VarChar(12)
+  nama       String     @db.VarChar(100)
+  noAims     String     @unique @map("no_aims") @db.Char(5)
+  majlis     String     @db.VarChar(150)
+  email      String     @db.VarChar(255)
+  usia       Int        @db.SmallInt
+  noHp       String     @map("no_hp") @db.VarChar(20)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  activities Activity[]
+
+  @@index([majlis])
+  @@index([email])
+  @@map("participants")
+}
+
+model Event {
+  id             String     @id @default(uuid())
+  nama           String     @db.VarChar(150)
+  deskripsi      String     @db.Text
+  tanggalMulai   DateTime   @map("tanggal_mulai") @db.Date
+  tanggalSelesai DateTime   @map("tanggal_selesai") @db.Date
+  isActive       Boolean    @default(true) @map("is_active")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  activities     Activity[]
+
+  @@index([isActive, tanggalSelesai(sort: Desc)])
+  @@map("events")
+}
+
+model Activity {
+  id               String      @id @default(uuid())
+  participantId    String      @map("participant_id")
+  eventId          String      @map("event_id")
+  stravaUrl        String      @map("strava_url") @db.VarChar(500)
+  stravaActivityId String?     @map("strava_activity_id") @db.VarChar(50)
+  distanceKm       Decimal     @map("distance_km") @db.Decimal(8, 2)
+  durationSec      Int         @map("duration_sec")
+  durationType     String      @default("moving") @map("duration_type") @db.VarChar(10)
+  pacePerKm        String?     @map("pace_per_km") @db.VarChar(10)
+  activityDate     DateTime    @map("activity_date") @db.Date
+  rawMeta          Json?       @map("raw_meta")
+  submittedAt      DateTime    @default(now()) @map("submitted_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  participant      Participant @relation(fields: [participantId], references: [id])
+  event            Event       @relation(fields: [eventId], references: [id])
+
+  @@unique([stravaActivityId, eventId])
+  @@unique([stravaActivityId])
+  @@index([eventId, participantId])
+  @@index([participantId, submittedAt])
+  @@index([eventId, distanceKm(sort: Desc)])
+  @@map("activities")
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  nama         String   @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admins")
+}
+
+model Majlis {
+  id       Int     @id @default(autoincrement())
+  nama     String  @unique @db.VarChar(150)
+  isActive Boolean @default(true) @map("is_active")
+
+  @@map("majlis")
+}
+```
+
+================================================================================
+SECTION 7: BUSINESS RULES
+================================================================================
+
+7.1 PARTICIPANT REGISTRATION
+
+    Required fields:
+      - nama        : string, 2–100 chars, letters and spaces only
+      - no_aims     : string, exactly 5 numeric digits (/^\d{5}$/)
+      - majlis      : string, must match an entry in majlis table (dropdown)
+      - email       : string, valid email format
+      - usia        : integer, range 10–99
+      - no_hp       : string, Indonesian phone format, normalized to 08xxxxxxxxxx
+
+    On submit:
+      1. Validate all fields (Zod schema)
+      2. Check no_aims is NOT already registered (UNIQUE constraint)
+         → If duplicate: return error (see 7.1.1)
+      3. Generate unique 8-char uppercase alphanumeric token (nanoid custom alphabet)
+         → Retry up to 5 times if collision (extremely unlikely)
+      4. Insert participant record
+      5. Redirect to /registrasi/sukses?token={token}
+
+    7.1.1 DUPLICATE AIMS ERROR
+      Message (Indonesian):
+        "No. AIMS {no_aims} sudah terdaftar. Jika Anda sudah memiliki token,
+         gunakan menu Input Aktivitas. Jika lupa token, gunakan menu Lupa Token."
+
+    7.1.2 TOKEN DISPLAY PAGE (/registrasi/sukses)
+      Flow:
+        1. Page loads → PixelCelebration animation plays first (~2.5s)
+           Text: "Mubarak! Khuddam Zindabad!"
+        2. onComplete → reveal token card
+
+      Token card content:
+      - Show token in large, copyable text (monospace font, tosca color)
+      - Warning message [MUST]:
+        "Ingat dan simpan token ini. Token diperlukan setiap kali Anda
+         menginput aktivitas. Token tidak dapat dipulihkan tanpa No. AIMS
+         dan email yang terdaftar."
+      - Buttons: [Input Aktivitas] → /input  |  [Kembali ke Beranda] → /
+      - [NICE] Copy-to-clipboard button for token
+
+7.2 TOKEN RECOVERY (/lupa-token)
+
+    Form fields:
+      - no_aims : 5-digit AIMS number
+      - email   : registered email address
+
+    On submit:
+      1. Find participant WHERE no_aims = input AND email = input
+      2. If found: display token with same warning as registration success page
+      3. If not found: "No. AIMS dan email tidak cocok. Periksa kembali data Anda."
+      4. Rate limit: max 5 attempts per IP per hour [SHOULD]
+
+    Security note:
+      - Requires BOTH AIMS + email to match (not AIMS alone)
+      - Do NOT send token via email in MVP (display on screen only)
+      - [POST-MVP] Send token via email/SMS
+
+7.3 ACTIVITY SUBMISSION
+
+    Form fields:
+      - token      : string, required (participant's token)
+      - strava_url : string, valid Strava share URL
+      - event_id   : UUID, must be an active event (dropdown of active events)
+
+    On submit (Server Action: submitActivity):
+      1. Validate form fields (Zod)
+      2. Find participant by token
+         → If not found: "Token tidak valid. Periksa kembali token Anda."
+      3. Check daily rate limit (see 7.4)
+         → If exceeded: "Token ini sudah mencapai batas 2 aktivitas hari ini. Coba lagi besok."
+      4. Validate event exists and is_active=true
+         → If not: "Event tidak aktif atau tidak ditemukan."
+      5. Parse Strava URL (see SECTION 8)
+         → Extract activity_date from OG meta tags (og:description, article:published_time)
+         → If parse fails: "Link Strava tidak dapat dibaca. Pastikan link valid dan publik."
+      6. Check activity_date is within event date range (inclusive, WIB date-only)
+         → If not: "Aktivitas tertanggal {activity_date} di luar periode event
+           ({tanggal_mulai} – {tanggal_selesai})."
+         → Example: event 16–26 Jun 2026, activity dated 14 Jun 2026 → REJECTED
+      7. Check strava_activity_id is not already submitted (globally unique)
+         → If duplicate: "Aktivitas Strava ini sudah pernah disubmit."
+      8. Compute pace_per_km from distance_km and duration_sec
+      9. Insert activity record
+      10. Return success with summary:
+          { nama, distance_km, duration, pace, sisa_kuota_hari_ini }
+
+      Client-side after success:
+        1. Play PixelCelebration overlay (~2.5s) — "Mubarak! Khuddam Zindabad!"
+        2. onComplete → show activity summary card + remaining daily quota
+
+    [NICE] Preview step:
+      - Before final submit, call POST /api/strava/parse to show parsed preview
+      - User confirms before saving
+
+7.4 DAILY RATE LIMIT
+
+    Rule: Each token may submit MAXIMUM 2 Strava activities per calendar day.
+
+    Timezone: Asia/Jakarta (WIB, UTC+7)
+    Reset: midnight WIB (00:00)
+
+    Implementation:
+      COUNT activities WHERE participant_id = X
+        AND submitted_at >= start_of_today_WIB
+        AND submitted_at < start_of_tomorrow_WIB
+
+    Limit is GLOBAL per token (across all events), not per event.
+
+    Response when limit reached:
+      "Token ini sudah mencapai batas 2 aktivitas hari ini. Coba lagi besok."
+
+    Display remaining quota after successful submit:
+      "Aktivitas berhasil disimpan. Sisa kuota hari ini: {2 - count} aktivitas."
+
+7.5 LEADERBOARD
+
+    Default metric: TOTAL distance_km per participant within selected event.
+    Tiebreaker: total activity count (more activities wins).
+    Second tiebreaker: earlier first submission timestamp.
+
+    Query (pseudocode):
+      SELECT
+        p.nama, p.majlis, p.no_aims,
+        SUM(a.distance_km) AS total_distance,
+        COUNT(a.id) AS activity_count,
+        AVG(a.duration_sec / a.distance_km) AS avg_pace_sec
+      FROM activities a
+      JOIN participants p ON a.participant_id = p.id
+      WHERE a.event_id = :eventId
+      GROUP BY p.id
+      ORDER BY total_distance DESC, activity_count DESC
+
+    Display columns:
+      Rank | Nama | Majlis | Total Jarak (km) | Jumlah Aktivitas | Pace Rata-rata
+
+    Event filter:
+      - Dropdown showing all events (active shown first, with label)
+      - Default selection: "event terkini" (see 6.2 notes)
+      - Changing filter reloads leaderboard data
+
+    Podium: top 3 displayed with pixel-style podium component (TopThreePodium)
+
+    [NICE] Period filter within event: minggu ini / bulan ini / semua
+
+7.6 ADMIN RULES
+
+    Event management:
+      - Only logged-in admins can create/edit/delete events
+      - tanggal_selesai must be >= tanggal_mulai
+      - Cannot hard-delete event that has activities → deactivate instead (is_active=false)
+      - deskripsi is plain text (textarea) in MVP
+
+    Participant data:
+      - Read-only in MVP (view + search + sort)
+      - [POST-MVP] Edit participant, regenerate token
+      - [NICE] Export to CSV
+
+    Admin accounts:
+      - Seeded via prisma/seed.ts
+      - [POST-MVP] Admin CRUD for additional admin accounts
+
+================================================================================
+SECTION 8: STRAVA DATA EXTRACTION
+================================================================================
+
+8.1 OVERVIEW
+
+    Strava share links are parsed server-side by fetching the public HTML page
+    and extracting Open Graph meta tags. NO Strava OAuth or official API is used.
+
+    Port logic from v2: apps/api/app/Services/StravaParserService.php
+    To: lib/strava-parser.ts using cheerio
+
+8.2 SUPPORTED URL FORMATS
+
+    https://www.strava.com/activities/{id}
+    https://www.strava.com/activities/{id}/share
+    https://strava.app.link/{code}          ← redirect, follow to resolve
+
+8.3 EXTRACTION PRIORITY
+
+    Field            Source (priority order)
+    -----            -----------------------
+    strava_activity_id  Extract numeric ID from URL path
+    title            og:title meta tag
+    distance_km      og:description regex OR structured data
+                     Pattern: "X.XX km" or "X,XX km" or "X.XX mi" (convert)
+    duration_sec     og:description regex
+                     Pattern: "MM:SS" or "H:MM:SS" for moving/elapsed time
+                     Prefer moving time label; fallback elapsed time
+    activity_date    og:description date OR article:published_time meta
+    sport_type       og:description keyword: "Run", "Ride", "Swim", "Walk"
+                     MVP: accept all types (no filter), store as-is
+    raw_meta         Snapshot of all extracted OG tags (JSON blob for audit)
+
+8.4 PACE CALCULATION
+
+    pace_sec_per_km = duration_sec / distance_km
+    Format as "M:SS" string:
+      minutes = Math.floor(pace_sec_per_km / 60)
+      seconds = Math.round(pace_sec_per_km % 60)
+      pace_per_km = `${minutes}:${seconds.toString().padStart(2, '0')}`
+
+    Only compute if distance_km > 0
+
+8.5 PARSE API ENDPOINT
+
+    POST /api/strava/parse
+    Body: { strava_url: string, event_id?: string }
+    Response: { data: { distance_km, duration_sec, duration_type, pace_per_km,
+                        activity_date, title, sport_type } }
+    Error:   { error: { code, message } }
+
+    When event_id is provided: also validates activity_date within event period.
+    Returns OUTSIDE_EVENT_PERIOD if activity date falls outside event range.
+
+    Rate limit: 10 requests per minute per IP [SHOULD]
+    Cache: parsed result cached 24h by strava_activity_id [NICE]
+
+    Used for preview before submit [NICE]. Direct submit also parses inline.
+
+8.6 ANTI-CHEATING VALIDATION
+
+    [MUST] strava_url must contain "strava.com"
+    [MUST] activity_date must not be in the future (WIB timezone)
+    [MUST] strava_activity_id globally unique (one link = one submission ever)
+    [MUST] strava_activity_id unique per event (double protection)
+    [SHOULD] distance_km must be > 0
+    [SHOULD] distance_km must be < 200 (sanity check for ultra distances)
+    [NICE] Flag activities with distance_km > 50 for admin review
+
+8.7 ERROR MESSAGES (Indonesian)
+
+    Code                  Message
+    ----                  -------
+    INVALID_URL           "Link Strava tidak valid. Pastikan URL mengandung strava.com"
+    PARSE_FAILED          "Tidak dapat membaca data aktivitas. Pastikan link publik dan valid."
+    FUTURE_DATE           "Tanggal aktivitas tidak boleh di masa depan."
+    DUPLICATE_ACTIVITY    "Aktivitas Strava ini sudah pernah disubmit."
+    RATE_LIMIT_EXCEEDED   "Token ini sudah mencapai batas 2 aktivitas hari ini."
+    INVALID_TOKEN         "Token tidak valid. Periksa kembali token Anda."
+    EVENT_INACTIVE        "Event tidak aktif atau tidak ditemukan."
+    OUTSIDE_EVENT_PERIOD  "Aktivitas tertanggal {date} di luar periode event ({mulai} – {selesai})."
+
+================================================================================
+SECTION 9: API ENDPOINTS & SERVER ACTIONS
+================================================================================
+
+9.1 SERVER ACTIONS (preferred for mutations)
+
+    Action                    File                              Auth
+    ------                    ----                              ----
+    registerParticipant       actions/register-participant.ts   Public
+    submitActivity            actions/submit-activity.ts        Public (token)
+    recoverToken              actions/recover-token.ts          Public
+    createEvent               actions/event.ts                  Admin
+    updateEvent               actions/event.ts                  Admin
+    deleteEvent               actions/event.ts                  Admin
+    toggleEventActive         actions/event.ts                  Admin
+
+9.2 ROUTE HANDLERS
+
+    Method  Route                              Purpose              Auth
+    ------  -----                              -------              ----
+    POST    /api/strava/parse                  Preview Strava parse Public
+    GET     /api/auth/[...nextauth]            Auth.js session      —
+    POST    /api/auth/[...nextauth]            Auth.js login        —
+    GET     /api/admin/export/peserta          CSV download         Admin
+
+9.3 RESPONSE SHAPE
+
+    Success: { data: T }
+    Error:   { error: { code: string, message: string, details?: unknown } }
+
+    Server Actions return type:
+      { success: true, data: T } | { success: false, error: { code, message } }
+
+================================================================================
+SECTION 10: KEY UI SCREENS (BUILD ORDER)
+================================================================================
+
+10.1 BUILD ORDER
+
+    Phase  Screen                          Route                  Priority
+    -----  ------                          -----                  --------
+    1      Homepage + Leaderboard          /                      [MUST]
+    2      Registration Form                 /registrasi            [MUST]
+    3      Registration Success (token)      /registrasi/sukses     [MUST]
+           + PixelCelebration animation on load
+    4      Activity Submit Form              /input                 [MUST]
+           + PixelCelebration on submit success
+    5      Token Recovery                    /lupa-token            [MUST]
+    6      Admin Login                       /login                 [MUST]
+    7      Admin Dashboard                   /admin                 [MUST]
+    8      Admin — Participant Data          /admin/peserta         [MUST]
+    9      Admin — Event List + CRUD         /admin/event           [MUST]
+    10     Full Leaderboard Page             /leaderboard           [SHOULD]
+    11     CSV Export                        /admin/peserta (btn)   [NICE]
+
+10.2 SCREEN SPECIFICATIONS
+
+    REGISTRATION FORM (/registrasi)
+      Fields:
+        - Nama Lengkap         (text input)
+        - No. AIMS             (text input, maxLength=5, pattern=[0-9]{5})
+        - Majlis               (searchable dropdown, ~160 options)
+        - Email                (email input)
+        - Usia                 (number input, min=10, max=99)
+        - No. HP               (tel input, placeholder: 08xxxxxxxxxx)
+      Submit button: "Daftar"
+      On success: redirect to /registrasi/sukses?token={token}
+      On success page: PixelCelebration plays → then token card revealed
+
+    ACTIVITY SUBMIT FORM (/input)
+      Fields:
+        - Token                (text input, uppercase, placeholder: "Masukkan token Anda")
+        - Link Activity Strava (url input, placeholder: "https://www.strava.com/activities/...")
+        - Event                (dropdown, active events only)
+      [NICE] "Preview" button → calls /api/strava/parse → shows parsed data
+      Submit button: "Submit Aktivitas"
+      On success: PixelCelebration plays → then summary card + remaining quota
+
+    PIXEL CELEBRATION OVERLAY (component, not a route)
+      Trigger: registration success + activity submit success
+      Text: "Mubarak! Khuddam Zindabad!"
+      Duration: ~2.5s, skippable [SHOULD]
+      See SECTION 4.7 for full animation spec
+
+    ADMIN — PARTICIPANT DATA (/admin/peserta)
+      Table columns: Token | Nama | No. AIMS | Majlis | Email | Usia | No. HP | Tgl Registrasi
+      Features: search (by nama, token, AIMS, majlis), column sort, pagination (50/page)
+      [NICE] Export CSV button
+
+    ADMIN — EVENT MANAGEMENT (/admin/event)
+      List view: Nama | Periode | Status (aktif/nonaktif) | Jumlah Aktivitas | Aksi
+      Create/Edit form fields:
+        - Nama Event     (text)
+        - Tanggal Mulai  (date picker)
+        - Tanggal Selesai(date picker)
+        - Deskripsi      (textarea, min 10 chars)
+        - Aktif          (toggle checkbox)
+      Delete: confirm dialog → soft delete (is_active=false) if has activities
+
+================================================================================
+SECTION 11: TYPESCRIPT TYPES
+================================================================================
+
+11.1 PARTICIPANT TYPES (types/participant.types.ts)
+
+    export interface Participant {
+      id: string
+      token: string
+      nama: string
+      noAims: string
+      majlis: string
+      email: string
+      usia: number
+      noHp: string
+      createdAt: string
+    }
+
+    export interface RegistrationInput {
+      nama: string
+      noAims: string
+      majlis: string
+      email: string
+      usia: number
+      noHp: string
+    }
+
+    export interface TokenRecoveryInput {
+      noAims: string
+      email: string
+    }
+
+11.2 ACTIVITY TYPES (types/activity.types.ts)
+
+    export interface Activity {
+      id: string
+      participantId: string
+      eventId: string
+      stravaUrl: string
+      stravaActivityId: string | null
+      distanceKm: number
+      durationSec: number
+      durationType: 'moving' | 'elapsed'
+      pacePerKm: string | null
+      activityDate: string
+      submittedAt: string
+    }
+
+    export interface SubmitActivityInput {
+      token: string
+      stravaUrl: string
+      eventId: string
+    }
+
+    export interface StravaParseResult {
+      stravaActivityId: string | null
+      title: string | null
+      distanceKm: number
+      durationSec: number
+      durationType: 'moving' | 'elapsed'
+      pacePerKm: string | null
+      activityDate: string
+      sportType: string | null
+      rawMeta: Record<string, string>
+    }
+
+11.3 EVENT TYPES (types/event.types.ts)
+
+    export interface Event {
+      id: string
+      nama: string
+      deskripsi: string
+      tanggalMulai: string
+      tanggalSelesai: string
+      isActive: boolean
+      createdAt: string
+      updatedAt: string
+    }
+
+    export interface EventInput {
+      nama: string
+      deskripsi: string
+      tanggalMulai: string
+      tanggalSelesai: string
+      isActive: boolean
+    }
+
+11.4 LEADERBOARD TYPES (types/leaderboard.types.ts)
+
+    export interface LeaderboardEntry {
+      rank: number
+      participantId: string
+      nama: string
+      majlis: string
+      noAims: string
+      totalDistanceKm: number
+      activityCount: number
+      avgPacePerKm: string | null
+    }
+
+    export interface LeaderboardData {
+      event: Event
+      entries: LeaderboardEntry[]
+      totalParticipants: number
+    }
+
+================================================================================
+SECTION 12: ZOD VALIDATION SCHEMAS
+================================================================================
+
+12.1 REGISTRATION (lib/validations/registration.schema.ts)
+
+    import { z } from 'zod'
+
+    export const registrationSchema = z.object({
+      nama: z
+        .string()
+        .min(2, 'Nama minimal 2 karakter')
+        .max(100, 'Nama maksimal 100 karakter')
+        .regex(/^[a-zA-Z\s.'-]+$/, 'Nama hanya boleh huruf dan spasi'),
+      noAims: z
+        .string()
+        .length(5, 'No. AIMS harus 5 digit')
+        .regex(/^\d{5}$/, 'No. AIMS harus berupa 5 digit angka'),
+      majlis: z
+        .string()
+        .min(1, 'Majlis wajib dipilih'),
+      email: z
+        .string()
+        .email('Format email tidak valid'),
+      usia: z
+        .number({ invalid_type_error: 'Usia harus angka' })
+        .int('Usia harus bilangan bulat')
+        .min(10, 'Usia minimal 10 tahun')
+        .max(99, 'Usia maksimal 99 tahun'),
+      noHp: z
+        .string()
+        .regex(/^08\d{8,11}$/, 'Format: 08xxxxxxxxxx'),
+    })
+
+    export const tokenRecoverySchema = z.object({
+      noAims: z
+        .string()
+        .length(5, 'No. AIMS harus 5 digit')
+        .regex(/^\d{5}$/, 'No. AIMS harus berupa 5 digit angka'),
+      email: z
+        .string()
+        .email('Format email tidak valid'),
+    })
+
+12.2 ACTIVITY (lib/validations/activity.schema.ts)
+
+    export const submitActivitySchema = z.object({
+      token: z
+        .string()
+        .min(1, 'Token wajib diisi')
+        .max(12, 'Token tidak valid'),
+      stravaUrl: z
+        .string()
+        .url('Format URL tidak valid')
+        .refine(
+          (url) => url.includes('strava.com') || url.includes('strava.app.link'),
+          'URL harus link Strava'
+        ),
+      eventId: z
+        .string()
+        .uuid('Event tidak valid'),
+    })
+
+12.3 EVENT (lib/validations/event.schema.ts)
+
+    export const eventSchema = z.object({
+      nama: z
+        .string()
+        .min(3, 'Nama event minimal 3 karakter')
+        .max(150, 'Nama event maksimal 150 karakter'),
+      deskripsi: z
+        .string()
+        .min(10, 'Deskripsi minimal 10 karakter')
+        .max(2000, 'Deskripsi maksimal 2000 karakter'),
+      tanggalMulai: z
+        .string()
+        .date('Format tanggal tidak valid'),
+      tanggalSelesai: z
+        .string()
+        .date('Format tanggal tidak valid'),
+      isActive: z.boolean().default(true),
+    }).refine(
+      (data) => new Date(data.tanggalSelesai) >= new Date(data.tanggalMulai),
+      { message: 'Tanggal selesai harus setelah tanggal mulai', path: ['tanggalSelesai'] }
+    )
+
+12.4 ADMIN LOGIN (lib/validations/admin.schema.ts)
+
+    export const adminLoginSchema = z.object({
+      email: z.string().email('Format email tidak valid'),
+      password: z.string().min(1, 'Password wajib diisi'),
+    })
+
+================================================================================
+SECTION 13: TOKEN GENERATION
+================================================================================
+
+13.1 ALGORITHM (lib/token-generator.ts)
+
+    import { customAlphabet } from 'nanoid'
+
+    // Uppercase letters + digits, no ambiguous chars (0/O, 1/I/L)
+    const ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+    const generate = customAlphabet(ALPHABET, 8)
+
+    export async function generateUniqueToken(): Promise<string> {
+      // Retry up to 5 times on collision (extremely unlikely with 32^8 combinations)
+      for (let i = 0; i < 5; i++) {
+        const token = generate()
+        const exists = await prisma.participant.findUnique({ where: { token } })
+        if (!exists) return token
+      }
+      throw new Error('Failed to generate unique token')
+    }
+
+    Token properties:
+      - Length: 8 characters
+      - Charset: 23456789ABCDEFGHJKMNPQRSTUVWXYZ (30 chars, no ambiguous)
+      - Total combinations: 30^8 = ~656 billion
+      - Case: always UPPERCASE
+      - Example: "K7M2P9XA"
+
+    Do NOT use sequential numbers (00001, 00002) — too guessable.
+
+================================================================================
+SECTION 14: DEVELOPMENT ROADMAP (PHASED)
+================================================================================
+
+PHASE 0: PROJECT SCAFFOLDING (Day 1–2)
+    [ ] Create Next.js 15 project with TypeScript + Tailwind
+    [ ] Configure tailwind.config.ts with light theme tokens (SECTION 4.2)
+    [ ] Setup globals.css with broken white base + pixel-render classes
+    [ ] Add dummy logo at public/images/logo.png
+    [ ] Add dummy runner sprite at public/images/celebration/runner-sprite.png
+    [ ] Create SiteLogo component (components/layout/SiteLogo.tsx)
+    [ ] Setup Prisma + PostgreSQL connection
+    [ ] Create prisma/schema.prisma (SECTION 6.6)
+    [ ] Run prisma migrate dev
+    [ ] Create data/majlis.json with ~160 majlis names
+    [ ] Create prisma/seed.ts (majlis, default admin, sample event)
+    [ ] Setup .env.example
+    [ ] Port pixel UI components from v2 apps/web/src/components/ui/
+    [ ] Setup Auth.js for admin login
+
+PHASE 1: PARTICIPANT REGISTRATION (Day 3–5)
+    [ ] RegistrationForm component with Zod validation
+    [ ] Server Action: registerParticipant
+    [ ] Token generation (lib/token-generator.ts)
+    [ ] AIMS uniqueness check + error handling
+    [ ] Registration success page with token display
+    [ ] PixelCelebration component (SECTION 4.7) — integrate on registrasi/sukses
+    [ ] Token recovery page (/lupa-token)
+    [ ] Server Action: recoverToken
+
+PHASE 2: STRAVA PARSER + ACTIVITY SUBMIT (Day 6–10)
+    [ ] Port StravaParserService.php → lib/strava-parser.ts (cheerio)
+    [ ] POST /api/strava/parse route handler
+    [ ] SubmitActivityForm component
+    [ ] Server Action: submitActivity (full validation pipeline)
+    [ ] Daily rate limit logic (lib/rate-limiter.ts)
+    [ ] Anti-cheating: duplicate detection, future date check
+    [ ] Success/error feedback with remaining quota display
+    [ ] Integrate PixelCelebration on activity submit success (/input)
+
+PHASE 3: LEADERBOARD + HOMEPAGE (Day 11–14)
+    [ ] Leaderboard aggregation query (lib/leaderboard.ts)
+    [ ] TopThreePodium component (port from v2)
+    [ ] LeaderboardTable component
+    [ ] EventFilter dropdown component
+    [ ] EventDescription component
+    [ ] Homepage (/) assembling all above
+    [ ] Full leaderboard page (/leaderboard)
+    [ ] SiteHeader with SiteLogo + navigation buttons (tosca header bar)
+
+PHASE 4: ADMIN PANEL (Day 15–19)
+    [ ] Admin login page (/login) with Auth.js credentials
+    [ ] middleware.ts for /admin route protection
+    [ ] Admin layout with sidebar (AdminSidebar)
+    [ ] Dashboard overview (/admin) — stats cards
+    [ ] Participant data table (/admin/peserta) with search + sort
+    [ ] Event list page (/admin/event)
+    [ ] Event create form (/admin/event/baru)
+    [ ] Event edit form (/admin/event/[id]/edit)
+    [ ] Soft delete for events with activities
+
+PHASE 5: POLISH + DEPLOY (Day 20–23)
+    [ ] Mobile responsive testing (360px–430px)
+    [ ] Test PixelCelebration on registration + activity submit flows
+    [ ] Test prefers-reduced-motion skip for celebration animation
+    [ ] Verify logo swap works by replacing public/images/logo.png only
+    [ ] Error message review (all Indonesian)
+    [ ] Loading states (PixelLoader)
+    [ ] Toast notifications (sonner)
+    [ ] vercel.json with build command
+    [ ] Connect Neon PostgreSQL via Vercel Storage
+    [ ] Set production env vars (DATABASE_URL, AUTH_SECRET, AUTH_URL)
+    [ ] Run prisma migrate deploy on production
+    [ ] Run prisma db seed on production
+    [ ] End-to-end smoke test on production URL
+    [ ] [NICE] CSV export for participant data
+
+TOTAL ESTIMATED TIME: 4–5 weeks (1 developer)
+
+================================================================================
+SECTION 15: DEPLOYMENT GUIDE (VERCEL)
+================================================================================
+
+15.1 ARCHITECTURE
+
+    Single Vercel Project:
+      menarun.vercel.app (or custom domain menarun.app)
+        ├── /                → Next.js pages (SSR/CSR)
+        ├── /api/*           → Route handlers (serverless)
+        ├── /admin/*         → Admin pages (protected)
+        └── Neon PostgreSQL  → Vercel Storage integration
+
+15.2 PREREQUISITES
+
+    - GitHub repository with menarun code
+    - Vercel account (free Hobby tier works for MVP)
+    - Neon PostgreSQL database (created via Vercel Storage tab)
+
+15.3 STEP-BY-STEP DEPLOY
+
+    STEP 1: Push code to GitHub
+      git add .
+      git commit -m "menaRun v3: Next.js monolith"
+      git push origin main
+
+    STEP 2: Import project to Vercel
+      - Go to vercel.com → Add New Project
+      - Import GitHub repo
+      - Framework Preset: Next.js (auto-detected)
+      - Root Directory: . (project root)
+
+    STEP 3: Create database
+      - Vercel Dashboard → Storage → Create Database → Neon (PostgreSQL)
+      - DATABASE_URL env var auto-injected into project
+
+    STEP 4: Set environment variables
+
+      DATABASE_URL=              # auto from Neon integration
+      AUTH_SECRET=               # generate: openssl rand -base64 32
+      AUTH_URL=                  # https://menarun.vercel.app (or custom domain)
+      TZ=Asia/Jakarta
+
+    STEP 5: Configure build (vercel.json)
+
+      {
+        "buildCommand": "prisma generate && prisma migrate deploy && next build",
+        "framework": "nextjs"
+      }
+
+    STEP 6: Deploy
+      - Click Deploy (or git push to main triggers auto-deploy)
+      - Verify build succeeds
+      - Run seed manually if needed:
+        npx prisma db seed (via Vercel CLI or one-time script)
+
+    STEP 7: Post-deploy verification
+      [ ] Homepage loads with leaderboard
+      [ ] Registration flow works → token displayed
+      [ ] Activity submit works with valid Strava link
+      [ ] Admin login works → dashboard accessible
+      [ ] Event CRUD works
+      [ ] Rate limit enforced (2/day)
+      [ ] AIMS duplicate rejected
+
+15.4 CUSTOM DOMAIN (OPTIONAL)
+
+      - Vercel → Project Settings → Domains → Add menarun.app
+      - Update DNS: CNAME menarun.app → cname.vercel-dns.com
+      - Update AUTH_URL env var to https://menarun.app
+      - SSL auto-provisioned by Vercel
+
+15.5 VERCEL LIMITATIONS TO BE AWARE OF
+
+    - Serverless function timeout: 10s (Hobby) / 60s (Pro)
+      → Strava parsing must complete within timeout
+      → Add timeout handling in strava-parser.ts (abort after 8s)
+    - No persistent filesystem → all data in PostgreSQL (no SQLite, no local files)
+    - No background workers → use Vercel Cron for scheduled tasks [NICE]
+    - Cold starts: first request after idle may be slow (1–2s)
+
+================================================================================
+SECTION 16: SEED DATA
+================================================================================
+
+16.1 MAJLIS LIST (data/majlis.json)
+
+    Format:
+    [
+      "Majlis Ansarullah Jakarta Pusat",
+      "Majlis Ansarullah Jakarta Selatan",
+      "Majlis Ansarullah Bandung",
+      ...
+    ]
+
+    ~160 entries. Provide actual list before seeding.
+    Placeholder entries in seed.ts until real list is provided.
+
+16.2 DEFAULT ADMIN (prisma/seed.ts)
+
+    email:    admin@menarun.app
+    password: Admin123! (CHANGE IN PRODUCTION)
+    nama:     Super Admin
+
+    Hash password with bcryptjs (12 rounds) before inserting.
+
+16.3 SAMPLE EVENT (prisma/seed.ts)
+
+    nama:           "Event Demo menaRun"
+    deskripsi:      "Event demo untuk testing platform menaRun. Silakan registrasi dan submit aktivitas lari Anda."
+    tanggal_mulai:  (today)
+    tanggal_selesai:(30 days from today)
+    is_active:      true
+
+================================================================================
+SECTION 17: TESTING STRATEGY (MINIMUM)
+================================================================================
+
+17.1 UNIT TESTS [SHOULD]
+
+    - lib/strava-parser.ts: test with saved HTML fixtures
+    - lib/token-generator.ts: format and uniqueness
+    - lib/rate-limiter.ts: daily count logic with timezone
+    - lib/leaderboard.ts: aggregation and ranking
+    - Zod schemas: valid and invalid inputs
+
+17.2 INTEGRATION TESTS [SHOULD]
+
+    - registerParticipant: success, duplicate AIMS, invalid fields
+    - submitActivity: success, invalid token, rate limit, duplicate strava
+    - recoverToken: success, no match
+    - Event CRUD: create, update, soft delete
+
+17.3 MANUAL SMOKE TEST CHECKLIST
+
+    [ ] Register new participant → receive token
+    [ ] Try register same AIMS → rejected
+    [ ] Submit activity with valid Strava link → success
+    [ ] Submit 3rd activity same day → rejected (rate limit)
+    [ ] Submit same Strava link again → rejected (duplicate)
+    [ ] Leaderboard updates after submit
+    [ ] Filter leaderboard by different event
+    [ ] Token recovery with correct AIMS + email → shows token
+    [ ] Token recovery with wrong data → error
+    [ ] Admin login → access dashboard
+    [ ] Admin create event → appears in dropdown and homepage
+    [ ] Admin view participant data → correct records
+    [ ] Mobile responsive at 375px width
+    [ ] Registration success shows celebration then token card
+    [ ] Activity submit success shows celebration then summary
+    [ ] Celebration skippable by tap/click [SHOULD]
+    [ ] Logo displays correctly at 32px height on mobile header
+
+================================================================================
+SECTION 18: COMMON PITFALLS TO AVOID
+================================================================================
+
+- ❌ Do NOT require login for participants — token-only flow
+- ❌ Do NOT allow duplicate AIMS numbers — enforce at app AND database level
+- ❌ Do NOT use sequential token numbers — use random 8-char alphanumeric
+- ❌ Do NOT hard-delete events that have activities — soft delete only
+- ❌ Do NOT use SQLite on Vercel — PostgreSQL only (serverless has no persistent FS)
+- ❌ Do NOT store admin password in plain text — bcryptjs hash only
+- ❌ Do NOT skip timezone on rate limit — must use Asia/Jakarta (WIB)
+- ❌ Do NOT allow Strava links to be submitted by multiple participants
+- ❌ Do NOT forget SPA-style routing is handled by Next.js App Router (no vercel.json rewrites needed)
+- ❌ Do NOT use dark navy background from v2 — v3 uses broken white light theme
+- ❌ Do NOT use white text on broken white backgrounds — text must be dark
+- ❌ Do NOT change celebration text — must be exactly "Mubarak! Khuddam Zindabad!"
+- ❌ Do NOT hard-code logo in component — always read from /images/logo.png
+- ❌ Do NOT build gamification, communities, or user profiles — out of scope for v3
+- ❌ Do NOT use Laravel, Filament, or Sanctum — this is a Next.js project
+- ❌ Do NOT hard-code API URLs — no separate API exists, use Server Actions
+- ❌ Do NOT forget to validate activity_date is within event date range
+- ❌ Do NOT display admin login as participant login — label clearly "Login Admin"
+
+================================================================================
+SECTION 19: GLOSSARY
+================================================================================
+
+AIMS        : Ahmadiyya Muslim Jama'at identification number (5-digit numeric ID)
+Token       : 8-character alphanumeric code issued to participant after registration
+Majlis      : Local chapter/organization unit (~160 exist, used as dropdown in registration)
+Event       : A time-bounded competition period managed by admin
+Activity    : A single Strava activity submission (link + parsed metadata)
+Pace        : Average speed per kilometer, formatted as "M:SS" (minutes:seconds)
+Leaderboard : Ranking of participants by total distance within an event
+Server Action: Next.js server-side function called directly from client components
+WIB         : Waktu Indonesia Barat (UTC+7), used for daily rate limit reset
+
+================================================================================
+SECTION 20: DECISIONS LOG (LOCKED)
+================================================================================
+
+Decision                              Choice                        Date
+--------                              ------                        ----
+Participant auth method               Token only (no login)         2026-06-11
+AIMS number uniqueness                UNIQUE — no duplicate reg     2026-06-11
+Token format                          8-char random alphanumeric    2026-06-11
+Token recovery method                 AIMS + email match            2026-06-11
+Daily submission limit                2 per token per day (WIB)     2026-06-11
+Rate limit scope                      Global per token (all events) 2026-06-11
+Leaderboard primary metric            Total distance_km per event   2026-06-11
+Leaderboard tiebreaker                Activity count                2026-06-11
+Event "terkini" definition            Active event within date range2026-06-11
+Strava link uniqueness                Global (one link = one submit)2026-06-11
+Majlis data source                    Static seed from JSON (~160)  2026-06-11
+Admin auth                            Auth.js credentials (email)   2026-06-11
+Deploy target                         Vercel single project         2026-06-11
+Database                              Neon PostgreSQL               2026-06-11
+UI theme                              Light broken white + hijau tosca 2026-06-11
+Logo                                  Dummy PNG at public/images/logo.png 2026-06-11
+Success animation                     PixelCelebration — Mario-style   2026-06-11
+Celebration text                      "Mubarak! Khuddam Zindabad!"     2026-06-11
+Email uniqueness                      NOT unique (only AIMS unique) 2026-06-11
+Event deletion with activities        Soft delete (is_active=false) 2026-06-11
+Duration type preference              Moving time, fallback elapsed  2026-06-11
+Activity date lock                    Must be within event period   2026-06-11
+Quote card placement                  Homepage + /leaderboard only  2026-06-11
+Site footer placement                 Public pages only (not admin) 2026-06-11
+
+================================================================================
+END OF DOCUMENT
+================================================================================
