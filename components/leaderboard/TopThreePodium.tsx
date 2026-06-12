@@ -8,7 +8,7 @@ interface TopThreePodiumProps {
 
 const PODIUM_ORDER = [1, 0, 2] as const;
 const MEDALS = ["🥇", "🥈", "🥉"] as const;
-const HEIGHTS = ["h-36", "h-28", "h-24"] as const;
+const HEIGHTS = ["h-40", "h-32", "h-30"] as const;
 const LABELS = ["1st", "2nd", "3rd"] as const;
 
 export function TopThreePodium({ entries }: TopThreePodiumProps) {
@@ -41,15 +41,15 @@ export function TopThreePodium({ entries }: TopThreePodiumProps) {
               {MEDALS[entryIndex]}
             </span>
             <PixelCard
-              className={`${HEIGHTS[entryIndex]} mt-2 flex w-full flex-col items-center justify-end p-3 text-center`}
+              className={`${HEIGHTS[entryIndex]} mt-2 flex w-full flex-col items-center justify-center gap-1 p-2 text-center md:gap-1.5 md:p-3`}
             >
               <p className="font-pixel text-[8px] text-tosca-dark md:text-[10px]">
                 {LABELS[entryIndex]}
               </p>
-              <p className="mt-1 line-clamp-2 font-sans text-xs font-semibold text-text-primary md:text-sm">
+              <p className="line-clamp-2 font-sans text-[11px] font-semibold leading-tight text-text-primary md:text-sm">
                 {entry.nama}
               </p>
-              <p className="mt-1 font-pixelBody text-sm text-tosca md:text-base">
+              <p className="font-pixelBody text-sm text-tosca md:text-base">
                 {formatDistance(entry.totalDistanceKm)}
               </p>
               <p className="font-sans text-[10px] text-text-muted md:text-xs">
