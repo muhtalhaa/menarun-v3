@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -165,15 +166,26 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
             {...register("eventId")}
           />
 
-          <PixelInput
-            label="Token"
-            placeholder="Masukkan token Anda"
-            className="uppercase"
-            error={errors.token?.message}
-            {...register("token", {
-              setValueAs: (v: string) => v.toUpperCase(),
-            })}
-          />
+          <div className="flex flex-col gap-1">
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1">
+                <PixelInput
+                  label="Token"
+                  placeholder="Masukkan token Anda"
+                  className="uppercase"
+                  error={errors.token?.message}
+                  {...register("token", {
+                    setValueAs: (v: string) => v.toUpperCase(),
+                  })}
+                />
+              </div>
+              <Link href="/lupa-token" className="shrink-0 pb-0.5">
+                <PixelButton type="button" variant="secondary" className="whitespace-nowrap text-[10px] md:text-xs">
+                  Lupa Token?
+                </PixelButton>
+              </Link>
+            </div>
+          </div>
 
           <div className="flex flex-col gap-2">
             <PixelInput

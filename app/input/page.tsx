@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SubmitActivityForm } from "@/components/forms/SubmitActivityForm";
@@ -42,15 +41,6 @@ export default async function InputPage() {
         ) : (
           <SubmitActivityForm events={eventOptions} />
         )}
-
-        <p className="mt-6 text-center font-pixelBody text-lg">
-          <Link
-            href="/lupa-token"
-            className="text-tosca underline-offset-2 hover:underline"
-          >
-            Lupa Token?
-          </Link>
-        </p>
 
         <SiteFooter />
       </div>
