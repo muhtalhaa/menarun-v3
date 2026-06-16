@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPesertaPage() {
-  const [participants, events] = await Promise.all([
+  const [participants, events, majlisList] = await Promise.all([
     prisma.participant.findMany({
       orderBy: { createdAt: "desc" },
       select: {
@@ -18,11 +18,17 @@ export default async function AdminPesertaPage() {
         usia: true,
         noHp: true,
         createdAt: true,
+        _count: { select: { activities: true } },
       },
     }),
     prisma.event.findMany({
       orderBy: { tanggalMulai: "desc" },
       select: { id: true, nama: true },
+    }),
+    prisma.majlis.findMany({
+      where: { isActive: true },
+      orderBy: { nama: "asc" },
+      select: { nama: true },
     }),
   ]);
 
@@ -31,8 +37,16 @@ export default async function AdminPesertaPage() {
   );
 
   const rows = participants.map((p) => ({
-    ...p,
+    id: p.id,
+    token: p.token,
+    nama: p.nama,
+    noAims: p.noAims,
+    majlis: p.majlis,
+    email: p.email,
+    usia: p.usia,
+    noHp: p.noHp,
     createdAt: p.createdAt.toISOString(),
+    activityCount: p._count.activities,
     activeBans: (banMap.get(p.id) ?? []).map((ban) => ({
       id: ban.id,
       eventNama: ban.eventNama,
@@ -51,7 +65,11 @@ export default async function AdminPesertaPage() {
       </p>
 
       <div className="mt-6">
-        <ParticipantsTable data={rows} events={events} />
+        <ParticipantsTable
+          data={rows}
+          events={events}
+          majlisOptions={majlisList.map((m) => m.nama)}
+        />
       </div>
     </div>
   );

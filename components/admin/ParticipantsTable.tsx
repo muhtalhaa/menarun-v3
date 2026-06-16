@@ -15,6 +15,8 @@ import {
 import { toast } from "sonner";
 import { unbanParticipant } from "@/actions/ban";
 import { BanParticipantDialog } from "@/components/admin/BanParticipantDialog";
+import { DeleteParticipantButton } from "@/components/admin/DeleteParticipantButton";
+import { EditParticipantDialog } from "@/components/admin/EditParticipantDialog";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { PixelInput } from "@/components/ui/PixelInput";
 import { PixelButton } from "@/components/ui/PixelButton";
@@ -38,6 +40,7 @@ export interface ParticipantRow {
   noHp: string;
   createdAt: string;
   activeBans: ParticipantBanRow[];
+  activityCount: number;
 }
 
 interface EventOption {
@@ -48,9 +51,10 @@ interface EventOption {
 interface ParticipantsTableProps {
   data: ParticipantRow[];
   events: EventOption[];
+  majlisOptions: string[];
 }
 
-export function ParticipantsTable({ data, events }: ParticipantsTableProps) {
+export function ParticipantsTable({ data, events, majlisOptions }: ParticipantsTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [sorting, setSorting] = useState<SortingState>([
@@ -58,6 +62,7 @@ export function ParticipantsTable({ data, events }: ParticipantsTableProps) {
   ]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [banTarget, setBanTarget] = useState<ParticipantRow | null>(null);
+  const [editTarget, setEditTarget] = useState<ParticipantRow | null>(null);
 
   const handleUnban = useCallback(
     (banId: string) => {
@@ -131,13 +136,27 @@ export function ParticipantsTable({ data, events }: ParticipantsTableProps) {
         id: "actions",
         header: "Aksi",
         cell: ({ row }) => (
-          <PixelButton
-            variant="secondary"
-            className="text-[10px] !px-2 !py-1 !text-semantic-danger"
-            onClick={() => setBanTarget(row.original)}
-          >
-            Ban
-          </PixelButton>
+          <div className="flex flex-wrap gap-1">
+            <PixelButton
+              variant="secondary"
+              className="text-[10px] !px-2 !py-1"
+              onClick={() => setEditTarget(row.original)}
+            >
+              Edit
+            </PixelButton>
+            <DeleteParticipantButton
+              participantId={row.original.id}
+              participantName={row.original.nama}
+              activityCount={row.original.activityCount}
+            />
+            <PixelButton
+              variant="secondary"
+              className="text-[10px] !px-2 !py-1 !text-semantic-danger"
+              onClick={() => setBanTarget(row.original)}
+            >
+              Ban
+            </PixelButton>
+          </div>
         ),
       },
     ],
@@ -268,6 +287,14 @@ export function ParticipantsTable({ data, events }: ParticipantsTableProps) {
           participantName={banTarget.nama}
           events={events}
           onClose={() => setBanTarget(null)}
+        />
+      )}
+
+      {editTarget && (
+        <EditParticipantDialog
+          participant={editTarget}
+          majlisOptions={majlisOptions}
+          onClose={() => setEditTarget(null)}
         />
       )}
     </div>
