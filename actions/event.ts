@@ -41,6 +41,8 @@ export async function createEvent(
       deskripsi: data.deskripsi,
       tanggalMulai: new Date(data.tanggalMulai),
       tanggalSelesai: new Date(data.tanggalSelesai),
+      jamMulaiSubmit: data.jamMulaiSubmit,
+      jamBatasSubmit: data.jamBatasSubmit,
       isActive: data.isActive,
     },
   });
@@ -90,6 +92,8 @@ export async function updateEvent(
       deskripsi: data.deskripsi,
       tanggalMulai: new Date(data.tanggalMulai),
       tanggalSelesai: new Date(data.tanggalSelesai),
+      jamMulaiSubmit: data.jamMulaiSubmit,
+      jamBatasSubmit: data.jamBatasSubmit,
       isActive: data.isActive,
     },
   });

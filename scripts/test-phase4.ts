@@ -12,6 +12,8 @@ async function testUnauthorized() {
     deskripsi: "Seharusnya ditolak karena tidak login.",
     tanggalMulai: "2026-01-01",
     tanggalSelesai: "2026-01-31",
+    jamMulaiSubmit: "06:00",
+    jamBatasSubmit: "22:00",
     isActive: true,
   });
 

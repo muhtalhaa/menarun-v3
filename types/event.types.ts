@@ -4,6 +4,8 @@ export interface Event {
   deskripsi: string;
   tanggalMulai: string;
   tanggalSelesai: string;
+  jamMulaiSubmit: string;
+  jamBatasSubmit: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

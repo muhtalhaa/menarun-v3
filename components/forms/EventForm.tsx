@@ -34,6 +34,8 @@ export function EventForm({ mode, eventId, defaultValues }: EventFormProps) {
       deskripsi: "",
       tanggalMulai: "",
       tanggalSelesai: "",
+      jamMulaiSubmit: "06:00",
+      jamBatasSubmit: "22:00",
       isActive: true,
     },
   });
@@ -87,6 +89,26 @@ export function EventForm({ mode, eventId, defaultValues }: EventFormProps) {
           error={errors.tanggalSelesai?.message}
           {...register("tanggalSelesai")}
         />
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <PixelInput
+            label="Jam Mulai Submit"
+            type="time"
+            error={errors.jamMulaiSubmit?.message}
+            {...register("jamMulaiSubmit")}
+          />
+
+          <PixelInput
+            label="Jam Batas Waktu Submit"
+            type="time"
+            error={errors.jamBatasSubmit?.message}
+            {...register("jamBatasSubmit")}
+          />
+        </div>
+        <p className="-mt-2 font-sans text-xs text-text-muted">
+          Peserta hanya dapat submit aktivitas pada jam tersebut (WIB) setiap
+          harinya selama periode event.
+        </p>
 
         <div className="flex flex-col gap-1">
           <label

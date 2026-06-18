@@ -47,6 +47,8 @@ async function main() {
           "Event demo untuk testing platform menaRun. Silakan registrasi dan submit aktivitas lari Anda.",
         tanggalMulai: today,
         tanggalSelesai: endDate,
+        jamMulaiSubmit: "06:00",
+        jamBatasSubmit: "22:00",
         isActive: true,
       },
     });

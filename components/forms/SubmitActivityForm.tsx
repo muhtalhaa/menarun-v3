@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -14,6 +14,11 @@ import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { formatDateId } from "@/lib/format";
 import {
+  buildSubmitWindowStatusMessage,
+  getSubmitWindowStatus,
+  type SubmitWindowStatus,
+} from "@/lib/submit-window";
+import {
   submitActivitySchema,
   type SubmitActivityInput,
 } from "@/lib/validations/activity.schema";
@@ -24,6 +29,8 @@ interface EventOption {
   nama: string;
   tanggalMulai: string;
   tanggalSelesai: string;
+  jamMulaiSubmit: string;
+  jamBatasSubmit: string;
 }
 
 interface SubmitActivityFormProps {
@@ -37,6 +44,9 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
   const [summary, setSummary] = useState<ActivitySubmitSummary | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [submitWindowStatus, setSubmitWindowStatus] =
+    useState<SubmitWindowStatus>("open");
+  const [now, setNow] = useState(() => new Date());
 
   const {
     register,
@@ -62,6 +72,34 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
     () => events.find((e) => e.id === eventId) ?? events[0],
     [events, eventId]
   );
+
+  useEffect(() => {
+    if (!selectedEvent) return;
+
+    function refreshStatus() {
+      setNow(new Date());
+      setSubmitWindowStatus(
+        getSubmitWindowStatus(
+          selectedEvent.jamMulaiSubmit,
+          selectedEvent.jamBatasSubmit
+        )
+      );
+    }
+
+    refreshStatus();
+    const interval = setInterval(refreshStatus, 30_000);
+    return () => clearInterval(interval);
+  }, [selectedEvent]);
+
+  const submitWindowMessage = selectedEvent
+    ? buildSubmitWindowStatusMessage(
+        selectedEvent.jamMulaiSubmit,
+        selectedEvent.jamBatasSubmit,
+        now
+      )
+    : null;
+
+  const isSubmitWindowOpen = submitWindowStatus === "open";
 
   function onSubmit(data: SubmitActivityInput) {
     setServerError(null);
@@ -166,6 +204,19 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
             {...register("eventId")}
           />
 
+          {selectedEvent && submitWindowMessage && (
+            <div
+              role="status"
+              className={`rounded-pixel border-2 px-3 py-2 font-sans text-xs font-semibold md:text-sm ${
+                isSubmitWindowOpen
+                  ? "border-semantic-success/40 bg-semantic-success/10 text-semantic-success"
+                  : "border-semantic-warning/40 bg-semantic-warning/10 text-text-primary"
+              }`}
+            >
+              {submitWindowMessage}
+            </div>
+          )}
+
           <div className="flex flex-col gap-1">
             <div className="flex items-end gap-2">
               <div className="min-w-0 flex-1">
@@ -240,6 +291,7 @@ export function SubmitActivityForm({ events }: SubmitActivityFormProps) {
           <PixelButton
             type="submit"
             isLoading={isPending}
+            disabled={!isSubmitWindowOpen}
             className="mt-2 w-full"
           >
             Submit Aktivitas

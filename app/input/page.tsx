@@ -15,6 +15,8 @@ export default async function InputPage() {
       nama: true,
       tanggalMulai: true,
       tanggalSelesai: true,
+      jamMulaiSubmit: true,
+      jamBatasSubmit: true,
     },
   });
 

@@ -24,6 +24,8 @@ export default async function AdminEventEditPage({ params }: PageProps) {
         deskripsi: event.deskripsi,
         tanggalMulai: formatInTimeZone(event.tanggalMulai, WIB, "yyyy-MM-dd"),
         tanggalSelesai: formatInTimeZone(event.tanggalSelesai, WIB, "yyyy-MM-dd"),
+        jamMulaiSubmit: event.jamMulaiSubmit,
+        jamBatasSubmit: event.jamBatasSubmit,
         isActive: event.isActive,
       }}
     />

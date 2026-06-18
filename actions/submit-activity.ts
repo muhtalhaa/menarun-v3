@@ -5,6 +5,10 @@ import {
   buildBanMessage,
   getActiveBanForParticipantEvent,
 } from "@/lib/ban";
+import {
+  buildOutsideSubmitWindowMessage,
+  isWithinSubmitWindow,
+} from "@/lib/submit-window";
 import { prisma } from "@/lib/prisma";
 import { type ActionResult } from "@/lib/errors";
 import {
@@ -58,6 +62,21 @@ export async function submitActivity(
       error: {
         code: "EVENT_INACTIVE",
         message: "Event tidak aktif atau tidak ditemukan.",
+      },
+    };
+  }
+
+  if (
+    !isWithinSubmitWindow(event.jamMulaiSubmit, event.jamBatasSubmit)
+  ) {
+    return {
+      success: false,
+      error: {
+        code: "OUTSIDE_SUBMIT_WINDOW",
+        message: buildOutsideSubmitWindowMessage(
+          event.jamMulaiSubmit,
+          event.jamBatasSubmit
+        ),
       },
     };
   }
