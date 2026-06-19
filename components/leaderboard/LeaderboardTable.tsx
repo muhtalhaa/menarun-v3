@@ -1,12 +1,15 @@
+import Link from "next/link";
+import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { formatDistance } from "@/lib/format";
 import type { LeaderboardEntry } from "@/types/leaderboard.types";
 
 interface LeaderboardTableProps {
+  eventId: string;
   entries: LeaderboardEntry[];
 }
 
-export function LeaderboardTable({ entries }: LeaderboardTableProps) {
+export function LeaderboardTable({ eventId, entries }: LeaderboardTableProps) {
   if (entries.length === 0) {
     return null;
   }
@@ -35,6 +38,9 @@ export function LeaderboardTable({ entries }: LeaderboardTableProps) {
               <th className="px-3 py-2 text-right font-semibold text-text-secondary">
                 Pace
               </th>
+              <th className="px-3 py-2 text-right font-semibold text-text-secondary">
+                Aksi
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -60,6 +66,18 @@ export function LeaderboardTable({ entries }: LeaderboardTableProps) {
                 </td>
                 <td className="px-3 py-2.5 text-right text-text-muted">
                   {entry.avgPacePerKm ? `${entry.avgPacePerKm}/km` : "–"}
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  <Link
+                    href={`/leaderboard/${eventId}/peserta/${entry.participantId}`}
+                  >
+                    <PixelButton
+                      variant="secondary"
+                      className="text-[10px] !px-2 !py-1"
+                    >
+                      Detail
+                    </PixelButton>
+                  </Link>
                 </td>
               </tr>
             ))}

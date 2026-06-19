@@ -44,7 +44,7 @@ export function LeaderboardView({
 
       <TopThreePodium entries={data.entries} />
 
-      <LeaderboardTable entries={data.entries} />
+      <LeaderboardTable eventId={data.event.id} entries={data.entries} />
 
       {data.totalParticipants > 0 && (
         <p className="text-center font-sans text-sm text-text-muted">
