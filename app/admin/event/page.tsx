@@ -97,6 +97,14 @@ export default async function AdminEventPage() {
                             Detail
                           </PixelButton>
                         </Link>
+                        <Link href={`/admin/event/${event.id}/laporan`}>
+                          <PixelButton
+                            variant="secondary"
+                            className="text-[10px] !px-2 !py-1"
+                          >
+                            Laporan
+                          </PixelButton>
+                        </Link>
                         <Link href={`/admin/event/${event.id}/edit`}>
                           <PixelButton
                             variant="secondary"
