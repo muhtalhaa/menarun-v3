@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-const LOGO_ASPECT_RATIO = 1575 / 999;
+const LOGO_ASPECT_RATIO = 1;
 
 interface SiteLogoProps {
   height?: number;
@@ -17,8 +17,8 @@ export function SiteLogo({ height = 32, className = "" }: SiteLogoProps) {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/images/logo.png"
-        alt="menaRun"
+        src="/images/logo-mkai.png"
+        alt="PPMKAI"
         width={width}
         height={height}
         data-pixel="true"
