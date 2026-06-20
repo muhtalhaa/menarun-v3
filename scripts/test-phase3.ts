@@ -36,11 +36,15 @@ async function main() {
       if (a.totalDistanceKm < b.totalDistanceKm) {
         throw new Error("Sorting by distance salah");
       }
-      if (
-        a.totalDistanceKm === b.totalDistanceKm &&
-        a.activityCount < b.activityCount
-      ) {
-        throw new Error("Tiebreaker activity count salah");
+      if (a.totalDistanceKm === b.totalDistanceKm) {
+        const paceSec = (pace: string | null) => {
+          if (!pace) return Number.POSITIVE_INFINITY;
+          const [minutes, seconds] = pace.split(":").map(Number);
+          return minutes * 60 + seconds;
+        };
+        if (paceSec(a.avgPacePerKm) > paceSec(b.avgPacePerKm)) {
+          throw new Error("Tiebreaker pace salah");
+        }
       }
     }
 

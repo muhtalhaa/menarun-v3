@@ -14,8 +14,8 @@ interface LeaderboardRow {
   no_aims: string;
   total_distance: number;
   activity_count: number;
-  first_submission: Date;
   avg_pace_sec: number | null;
+  total_elevation: number;
 }
 
 export async function getLeaderboardEntries(
@@ -29,16 +29,16 @@ export async function getLeaderboardEntries(
       p.no_aims,
       SUM(a.distance_km)::float AS total_distance,
       COUNT(a.id)::int AS activity_count,
-      MIN(a.submitted_at) AS first_submission,
-      AVG(a.duration_sec / NULLIF(a.distance_km::float, 0)) AS avg_pace_sec
+      AVG(a.duration_sec / NULLIF(a.distance_km::float, 0)) AS avg_pace_sec,
+      SUM(a.elevation_m)::int AS total_elevation
     FROM activities a
     INNER JOIN participants p ON a.participant_id = p.id
     WHERE a.event_id = ${eventId}
     GROUP BY p.id, p.nama, p.majlis, p.no_aims
     ORDER BY
       total_distance DESC,
-      activity_count DESC,
-      first_submission ASC
+      avg_pace_sec ASC NULLS LAST,
+      total_elevation DESC
   `;
 
   return rows.map((row, index) => ({
