@@ -33,13 +33,13 @@ export function LeaderboardTable({ eventId, entries }: LeaderboardTableProps) {
                 Jarak
               </th>
               <th className="px-3 py-2 text-right font-semibold text-text-secondary">
-                Akt.
-              </th>
-              <th className="px-3 py-2 text-right font-semibold text-text-secondary">
                 Pace
               </th>
               <th className="px-3 py-2 text-right font-semibold text-text-secondary">
-                Aksi
+                Elevasi
+              </th>
+              <th className="px-3 py-2 text-right font-semibold text-text-secondary">
+                Ket.
               </th>
             </tr>
           </thead>
@@ -61,11 +61,11 @@ export function LeaderboardTable({ eventId, entries }: LeaderboardTableProps) {
                 <td className="px-3 py-2.5 text-right font-medium text-tosca-dark">
                   {formatDistance(entry.totalDistanceKm)}
                 </td>
-                <td className="px-3 py-2.5 text-right text-text-secondary">
-                  {entry.activityCount}
-                </td>
                 <td className="px-3 py-2.5 text-right text-text-muted">
                   {entry.avgPacePerKm ? `${entry.avgPacePerKm}/km` : "–"}
+                </td>
+                <td className="px-3 py-2.5 text-right text-text-secondary">
+                  {entry.totalElevationM} m
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <Link

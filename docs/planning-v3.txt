@@ -610,7 +610,7 @@ SECTION 5: ROUTING STRUCTURE
     │                                     │
     │      🥈 2nd   🥇 1st   🥉 3rd       │  ← white cards on broken white
     │                                     │
-    │  #  Nama     Majlis    Jarak  Akt.  │
+    │  #  Nama     Majlis    Jarak  Aktivitas  │
     │  1  Ahmad    Majlis A   42.5km  8   │
     │  2  Budi     Majlis B   38.2km  6   │
     │  ...                                │

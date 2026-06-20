@@ -27,7 +27,7 @@ async function main() {
   if (data.entries.length > 0) {
     const first = data.entries[0];
     console.log(
-      `   Rank 1: ${first.nama} — ${first.totalDistanceKm} km (${first.activityCount} akt.)`
+      `   Rank 1: ${first.nama} — ${first.totalDistanceKm} km (${first.activityCount} Aktivitas)`
     );
 
     if (data.entries.length >= 2) {

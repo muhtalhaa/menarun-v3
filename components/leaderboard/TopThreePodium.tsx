@@ -53,7 +53,7 @@ export function TopThreePodium({ entries }: TopThreePodiumProps) {
                 {formatDistance(entry.totalDistanceKm)}
               </p>
               <p className="font-sans text-[10px] text-text-muted md:text-xs">
-                {entry.activityCount} akt.
+                {entry.activityCount} Aktivitas
               </p>
             </PixelCard>
           </div>

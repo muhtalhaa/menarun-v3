@@ -1,5 +1,5 @@
 import { startOfDay } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 import { prisma } from "@/lib/prisma";
 import type { EventFilterOption, EventSummary } from "@/types/event.types";
 
@@ -26,6 +26,15 @@ function toEventSummary(event: {
     tanggalSelesai: event.tanggalSelesai,
     isActive: event.isActive,
   };
+}
+
+export function getEventEndDateTime(tanggalSelesai: Date): Date {
+  const dateStr = formatInTimeZone(
+    tanggalSelesai,
+    WIB_TIMEZONE,
+    "yyyy-MM-dd"
+  );
+  return fromZonedTime(`${dateStr}T23:59:59.999`, WIB_TIMEZONE);
 }
 
 export function isEventInActivePeriod(

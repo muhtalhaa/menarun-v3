@@ -21,6 +21,7 @@ export function EventFilter({ events, selectedEventId }: EventFilterProps) {
     } else {
       params.delete("eventId");
     }
+    params.delete("page");
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname);
   }

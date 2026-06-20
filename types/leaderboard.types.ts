@@ -9,11 +9,13 @@ export interface LeaderboardEntry {
   totalDistanceKm: number;
   activityCount: number;
   avgPacePerKm: string | null;
+  totalElevationM: number;
 }
 
 export interface LeaderboardData {
   event: EventSummary;
   entries: LeaderboardEntry[];
   totalParticipants: number;
+  totalDistanceKm: number;
   isEventCurrentlyActive: boolean;
 }

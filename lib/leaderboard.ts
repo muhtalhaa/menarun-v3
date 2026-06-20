@@ -53,6 +53,7 @@ export async function getLeaderboardEntries(
       row.avg_pace_sec && row.avg_pace_sec > 0
         ? computePacePerKm(1, Math.round(row.avg_pace_sec))
         : null,
+    totalElevationM: row.total_elevation,
   }));
 }
 
@@ -74,11 +75,16 @@ export async function getLeaderboardData(
   }
 
   const entries = await getLeaderboardEntries(event.id);
+  const totalDistanceKm =
+    Math.round(
+      entries.reduce((sum, entry) => sum + entry.totalDistanceKm, 0) * 100
+    ) / 100;
 
   return {
     event,
     entries,
     totalParticipants: entries.length,
+    totalDistanceKm,
     isEventCurrentlyActive,
   };
 }

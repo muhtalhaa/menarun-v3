@@ -12,15 +12,16 @@ import {
   getLeaderboardData,
   resolveLeaderboardEventId,
 } from "@/lib/leaderboard";
+import { parseLeaderboardPage } from "@/lib/leaderboard-pagination";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: Promise<{ eventId?: string }>;
+  searchParams: Promise<{ eventId?: string; page?: string }>;
 }
 
 export default async function HomePage({ searchParams }: PageProps) {
-  const { eventId: requestedEventId } = await searchParams;
+  const { eventId: requestedEventId, page: requestedPage } = await searchParams;
   const resolvedEventId = await resolveLeaderboardEventId(requestedEventId);
   const events = await getEventsForFilter();
 
@@ -83,7 +84,12 @@ export default async function HomePage({ searchParams }: PageProps) {
             </div>
           }
         >
-          <LeaderboardView data={data} events={events} showCta />
+          <LeaderboardView
+            data={data}
+            events={events}
+            page={parseLeaderboardPage(requestedPage)}
+            showCta
+          />
         </Suspense>
 
         <p className="mt-8 text-center font-pixelBody text-lg">
